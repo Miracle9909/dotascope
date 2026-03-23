@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DotaScope — Live Dota 2 Analytics & Win Prediction</title>
+    <meta name="description"
+        content="Real-time Dota 2 match tracking with AI-powered win prediction based on draft, player hero pool, net worth, and tower status.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+</head>
+
+<body>
+    <header id="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">⚔️</span>
+                <span class="logo-text">DOTA<span class="accent">SCOPE</span></span>
+            </div>
+            <span class="logo-version">v2.0</span>
+        </div>
+        <nav class="header-nav" id="mainNav">
+            <button class="nav-btn active" data-view="live" id="navLive"><span class="pulse-dot"></span> LIVE</button>
+            <button class="nav-btn" data-view="results" id="navResults">RESULTS</button>
+            <button class="nav-btn" data-view="draft" id="navDraft">DRAFT ANALYZER</button>
+        </nav>
+        <div class="header-right">
+            <div class="refresh-indicator" id="refreshIndicator">
+                <span class="refresh-icon">⟳</span> <span id="refreshTimer">8s</span>
+            </div>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot online"></span><span>LIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="app">
+        <!-- LIVE VIEW -->
+        <section id="liveView" class="view active">
+            <div class="view-header">
+                <h1>🔴 Live Matches</h1>
+                <div class="match-count" id="matchCount">Loading...</div>
+            </div>
+            <div class="matches-grid" id="matchesGrid">
+                <div class="loading-state">
+                    <div class="loader"></div>
+                    <p>Connecting to Dota 2 servers...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- MATCH DETAIL MODAL -->
+        <div class="modal-overlay" id="matchModal">
+            <div class="modal-content" id="matchDetail"></div>
+        </div>
+
+        <!-- PLAYER DETAIL MODAL -->
+        <div class="modal-overlay" id="playerModal">
+            <div class="modal-content modal-sm" id="playerDetail"></div>
+        </div>
+
+        <!-- RESULTS VIEW -->
+        <section id="resultsView" class="view">
+            <div class="view-header">
+                <h1>📊 Recent Pro Results</h1>
+            </div>
+            <div id="resultsGrid" class="matches-grid">
+                <div class="loading-state">
+                    <div class="loader"></div>
+                    <p>Loading results...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- DRAFT ANALYZER VIEW -->
+        <section id="draftView" class="view">
+            <div class="view-header">
+                <h1>🧠 Draft Analyzer</h1>
+                <p class="view-subtitle">Pick heroes to predict win probability</p>
+            </div>
+            <div class="draft-analyzer">
+                <div class="draft-team radiant-team">
+                    <h2 class="team-label radiant">☀️ RADIANT</h2>
+                    <div class="draft-slots" id="radiantSlots"></div>
+                    <div class="win-bar">
+                        <div class="win-fill radiant-fill" id="radiantWinBar"></div>
+                    </div>
+                    <div class="win-pct" id="radiantWinPct">50%</div>
+                </div>
+                <div class="draft-vs">
+                    <span class="vs-text">VS</span>
+                    <button class="reset-draft-btn" id="resetDraft">⟳ Reset</button>
+                </div>
+                <div class="draft-team dire-team">
+                    <h2 class="team-label dire">🌙 DIRE</h2>
+                    <div class="draft-slots" id="direSlots"></div>
+                    <div class="win-bar">
+                        <div class="win-fill dire-fill" id="direWinBar"></div>
+                    </div>
+                    <div class="win-pct" id="direWinPct">50%</div>
+                </div>
+            </div>
+            <div class="hero-picker">
+                <div class="picker-header">
+                    <input type="text" class="hero-search" id="heroSearch" placeholder="🔍 Search heroes...">
+                    <div class="hero-filters" id="heroFilters">
+                        <button class="filter-btn active" data-attr="all">All</button>
+                        <button class="filter-btn" data-attr="str">💪 STR</button>
+                        <button class="filter-btn" data-attr="agi">🏹 AGI</button>
+                        <button class="filter-btn" data-attr="int">🧠 INT</button>
+                        <button class="filter-btn" data-attr="uni">✨ UNI</button>
+                    </div>
+                </div>
+                <div class="hero-grid" id="heroGrid"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>DotaScope v2.0 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> • Player data
+            from <a href="https://liquipedia.net/dota2/" target="_blank">Liquipedia</a></p>
+        <p class="footer-note">Data refreshed every 8s • Not affiliated with Valve Corporation</p>
+    </footer>
+
+    <script src="heroes.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
