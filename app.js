@@ -1,7 +1,9 @@
 /* ============================================ */
 /* DotaPlay v3.0 — Live Analytics & Win Predict  */
 /* Multi-source API + Tower + Player stats       */
+/* Build: 2026-03-24T16:30                       */
 /* ============================================ */
+console.log('🎮 DotaPlay v3.0 loaded | Proxy:', '/api', '| Host:', location.hostname);
 
 // Multi-source API endpoints (race for fastest)
 const SOURCES = [
