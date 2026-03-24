@@ -1482,9 +1482,14 @@ a.detail-team-name:hover {
         left: 0 !important;
         right: 0 !important;
         top: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: 60px;
         z-index: 200;
         display: flex !important;
         flex-direction: row !important;
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
         gap: 4px;
         background: rgba(10, 14, 23, 0.98);
         backdrop-filter: blur(20px);
@@ -1498,13 +1503,15 @@ a.detail-team-name:hover {
     }
 
     .nav-btn {
-        flex: 1;
+        flex: 1 0 auto;
         justify-content: center;
         padding: 10px 6px;
         font-size: 11px;
         border-radius: 10px;
         letter-spacing: 0.3px;
         white-space: nowrap;
+        height: auto;
+        max-height: 40px;
     }
 
     .nav-btn.active {
