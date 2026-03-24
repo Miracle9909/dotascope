@@ -14,9 +14,8 @@ const REFRESH_MS = 15000;
 const MIN_REFRESH_MS = 15000;
 const MAX_REFRESH_MS = 120000;
 
-// Auto-detect if running on Vercel (use server-side proxy to avoid rate limits)
-const IS_VERCEL = location.hostname.includes('vercel.app') || location.hostname.includes('dotaplay');
-const PROXY_API = IS_VERCEL ? '/api' : null;
+// Auto-detect proxy: always try /api first, falls back to direct if 404
+const PROXY_API = '/api';
 
 let currentRefresh = REFRESH_MS;
 let consecutiveErrors = 0;
