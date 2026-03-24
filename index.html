@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DotaScope — Live Dota 2 Analytics & Win Prediction</title>
+    <title>DotaPlay — Live Dota 2 Analytics & Win Prediction</title>
     <meta name="description"
         content="Real-time Dota 2 match tracking with AI-powered win prediction based on draft, player hero pool, net worth, and tower status.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon"
@@ -21,9 +21,9 @@
         <div class="header-left">
             <div class="logo">
                 <span class="logo-icon">⚔️</span>
-                <span class="logo-text">DOTA<span class="accent">SCOPE</span></span>
+                <span class="logo-text">DOTA<span class="accent">PLAY</span></span>
             </div>
-            <span class="logo-version">v2.0</span>
+            <span class="logo-version">v3.0</span>
         </div>
         <nav class="header-nav" id="mainNav">
             <button class="nav-btn active" data-view="live" id="navLive"><span class="pulse-dot"></span> LIVE</button>
@@ -32,10 +32,11 @@
         </nav>
         <div class="header-right">
             <div class="refresh-indicator" id="refreshIndicator">
-                <span class="refresh-icon">⟳</span> <span id="refreshTimer">8s</span>
+                <span class="refresh-icon">⟳</span> <span id="refreshTimer">15s</span>
             </div>
             <div class="connection-status" id="connectionStatus">
                 <span class="status-dot online"></span><span>LIVE</span>
+                <span id="sourceBadge" style="margin-left:6px"></span>
             </div>
         </div>
     </header>
@@ -123,9 +124,10 @@
     </main>
 
     <footer>
-        <p>DotaScope v2.0 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> • Player data
+        <p>DotaPlay v3.0 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> • Player data
             from <a href="https://liquipedia.net/dota2/" target="_blank">Liquipedia</a></p>
-        <p class="footer-note">Data refreshed every 8s • Not affiliated with Valve Corporation</p>
+        <p class="footer-note">Data refreshed every 15s • Multi-source with backoff • Not affiliated with Valve
+            Corporation</p>
     </footer>
 
     <script src="heroes.js"></script>

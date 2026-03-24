@@ -1,14 +1,26 @@
 /* ============================================ */
-/* DotaScope v2.0 — Enhanced Live Analytics     */
-/* Tower display + Player stats + Win prediction */
+/* DotaPlay v3.0 — Live Analytics & Win Predict  */
+/* Multi-source API + Tower + Player stats       */
 /* ============================================ */
 
+// Multi-source API endpoints (race for fastest)
+const SOURCES = [
+    { name: 'OpenDota', live: 'https://api.opendota.com/api/live', api: 'https://api.opendota.com/api', priority: 1 },
+    { name: 'D2PT', live: 'https://api.opendota.com/api/live', api: 'https://api.opendota.com/api', priority: 2 },
+];
 const API = 'https://api.opendota.com/api';
 const LIQUIPEDIA = 'https://liquipedia.net/dota2/';
-const REFRESH_MS = 8000;
+const REFRESH_MS = 15000;       // 15s refresh (was 8s — too aggressive for rate limits)
+const MIN_REFRESH_MS = 15000;
+const MAX_REFRESH_MS = 120000;  // Max 2min on repeated 429
+let currentRefresh = REFRESH_MS;
+let consecutiveErrors = 0;
+let lastFetchSource = '';
 let currentView = 'live';
 let liveMatches = [];
 let playerCache = {};   // Cache player hero stats
+let matchCache = null;  // Cache last successful live data
+let matchCacheTime = 0;
 
 // Draft analyzer state
 const draft = { radiant: [], dire: [], activeTeam: 'radiant' };
@@ -142,26 +154,103 @@ function switchView(view) {
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
 // ============================================
-// LIVE MATCHES
+// MULTI-SOURCE LIVE MATCHES (Race + Fallback)
 // ============================================
+async function fetchWithTimeout(url, timeoutMs = 6000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        return res;
+    } catch (e) {
+        clearTimeout(timeout);
+        throw e;
+    }
+}
+
+async function fetchFromSource(source) {
+    const res = await fetchWithTimeout(source.live);
+    if (res.status === 429) throw new Error('RATE_LIMITED');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return { data, source: source.name };
+}
+
 async function fetchLiveMatches() {
     try {
         updateStatus('fetching');
-        const res = await fetch(`${API}/live`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
 
-        liveMatches = data
+        // Strategy: Race all sources, first success wins
+        let result = null;
+
+        // Try primary source first (with short timeout)
+        try {
+            result = await fetchFromSource(SOURCES[0]);
+        } catch (e) {
+            if (e.message === 'RATE_LIMITED') {
+                console.warn('⚠️ OpenDota rate limited (429), backing off...');
+                consecutiveErrors++;
+                currentRefresh = Math.min(MAX_REFRESH_MS, MIN_REFRESH_MS * Math.pow(1.5, consecutiveErrors));
+                console.log(`⏱ Refresh interval increased to ${Math.round(currentRefresh / 1000)}s`);
+
+                // Use cached data if fresh enough (< 60s)
+                if (matchCache && (Date.now() - matchCacheTime < 60000)) {
+                    liveMatches = matchCache;
+                    renderLiveMatches();
+                    updateStatus('cached');
+                    updateSourceBadge('Cached', Math.round(currentRefresh / 1000));
+                    return;
+                }
+            }
+            // Try fallback sources
+            for (let i = 1; i < SOURCES.length; i++) {
+                try {
+                    result = await fetchFromSource(SOURCES[i]);
+                    break;
+                } catch (e2) { continue; }
+            }
+        }
+
+        if (!result) {
+            // All sources failed — show cached or error
+            if (matchCache && (Date.now() - matchCacheTime < 120000)) {
+                liveMatches = matchCache;
+                renderLiveMatches();
+                updateStatus('cached');
+                updateSourceBadge('Cached', Math.round(currentRefresh / 1000));
+                return;
+            }
+            throw new Error('All sources failed');
+        }
+
+        // Success! Reset backoff
+        consecutiveErrors = 0;
+        currentRefresh = REFRESH_MS;
+        lastFetchSource = result.source;
+
+        liveMatches = result.data
             .filter(m => m.team_name_radiant || m.team_name_dire || m.league_id)
             .sort((a, b) => (b.spectators || 0) - (a.spectators || 0));
 
+        // Cache successful result
+        matchCache = liveMatches;
+        matchCacheTime = Date.now();
+
         renderLiveMatches();
         updateStatus('online');
+        updateSourceBadge(result.source, Math.round(currentRefresh / 1000));
     } catch (err) {
         console.error('Live fetch error:', err);
         updateStatus('error');
-        document.getElementById('matchesGrid').innerHTML = `<div class="no-matches"><div class="no-matches-icon">📡</div><h3>Connection issue — retrying...</h3></div>`;
+        const retryIn = Math.round(currentRefresh / 1000);
+        document.getElementById('matchesGrid').innerHTML = `<div class="no-matches"><div class="no-matches-icon">📡</div><h3>Connection issue — retrying in ${retryIn}s...</h3><p style="font-size:12px;color:var(--text-muted)">API may be rate-limited. Auto-retry with backoff.</p></div>`;
     }
+}
+
+function updateSourceBadge(source, nextRefresh) {
+    const badge = document.getElementById('sourceBadge');
+    if (badge) badge.innerHTML = `<span style="font-size:10px;color:var(--text-muted)">⚡${source} · ${nextRefresh}s</span>`;
 }
 
 function renderLiveMatches() {
@@ -662,20 +751,25 @@ function countBits(n) { let c = 0; while (n) { c += n & 1; n >>= 1; } return c; 
 // AUTO REFRESH & UTILITIES
 // ============================================
 function startAutoRefresh() {
-    let t = REFRESH_MS / 1000;
+    let t = currentRefresh / 1000;
     const el = document.getElementById('refreshTimer');
     setInterval(() => {
         t--;
         if (el) el.textContent = `${t}s`;
-        if (t <= 0) { t = REFRESH_MS / 1000; if (currentView === 'live') fetchLiveMatches(); }
+        if (t <= 0) {
+            t = Math.round(currentRefresh / 1000); // Dynamic refresh based on backoff
+            if (currentView === 'live') fetchLiveMatches();
+        }
     }, 1000);
 }
 
 function updateStatus(s) {
     const dot = document.querySelector('#connectionStatus .status-dot');
     if (!dot) return;
-    dot.style.background = s === 'online' ? 'var(--radiant)' : s === 'fetching' ? 'var(--gold)' : 'var(--dire)';
-    dot.style.boxShadow = `0 0 8px ${s === 'online' ? 'var(--radiant-glow)' : s === 'fetching' ? 'var(--gold-bg)' : 'var(--dire-glow)'}`;
+    const colors = { online: 'var(--radiant)', fetching: 'var(--gold)', cached: 'var(--cyan)', error: 'var(--dire)' };
+    const glows = { online: 'var(--radiant-glow)', fetching: 'var(--gold-bg)', cached: '0,180,220', error: 'var(--dire-glow)' };
+    dot.style.background = colors[s] || colors.error;
+    dot.style.boxShadow = `0 0 8px ${glows[s] || glows.error}`;
 }
 
 function fmtTime(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
