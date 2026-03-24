@@ -10,16 +10,21 @@ const SOURCES = [
 ];
 const API = 'https://api.opendota.com/api';
 const LIQUIPEDIA = 'https://liquipedia.net/dota2/';
-const REFRESH_MS = 15000;       // 15s refresh (was 8s — too aggressive for rate limits)
+const REFRESH_MS = 15000;
 const MIN_REFRESH_MS = 15000;
-const MAX_REFRESH_MS = 120000;  // Max 2min on repeated 429
+const MAX_REFRESH_MS = 120000;
+
+// Auto-detect if running on Vercel (use server-side proxy to avoid rate limits)
+const IS_VERCEL = location.hostname.includes('vercel.app') || location.hostname.includes('dotaplay');
+const PROXY_API = IS_VERCEL ? '/api' : null;
+
 let currentRefresh = REFRESH_MS;
 let consecutiveErrors = 0;
 let lastFetchSource = '';
 let currentView = 'live';
 let liveMatches = [];
-let playerCache = {};   // Cache player hero stats
-let matchCache = null;  // Cache last successful live data
+let playerCache = {};
+let matchCache = null;
 let matchCacheTime = 0;
 
 // Draft analyzer state
@@ -87,7 +92,10 @@ function renderTowerStatus(buildingState) {
 async function fetchPlayerHeroes(accountId) {
     if (playerCache[accountId]) return playerCache[accountId];
     try {
-        const res = await fetch(`${API}/players/${accountId}/heroes?limit=30&date=180`);
+        const url = PROXY_API
+            ? `${PROXY_API}/player?id=${accountId}&type=heroes`
+            : `${API}/players/${accountId}/heroes?limit=30&date=180`;
+        const res = await fetch(url);
         if (!res.ok) return null;
         const heroes = await res.json();
         const result = {};
@@ -103,7 +111,10 @@ async function fetchPlayerHeroes(accountId) {
 
 async function fetchPlayerProfile(accountId) {
     try {
-        const res = await fetch(`${API}/players/${accountId}`);
+        const url = PROXY_API
+            ? `${PROXY_API}/player?id=${accountId}&type=profile`
+            : `${API}/players/${accountId}`;
+        const res = await fetch(url);
         if (!res.ok) return null;
         return await res.json();
     } catch { return null; }
@@ -111,7 +122,10 @@ async function fetchPlayerProfile(accountId) {
 
 async function fetchPlayerRecent(accountId) {
     try {
-        const res = await fetch(`${API}/players/${accountId}/recentMatches?limit=10`);
+        const url = PROXY_API
+            ? `${PROXY_API}/player?id=${accountId}&type=recent`
+            : `${API}/players/${accountId}/recentMatches?limit=10`;
+        const res = await fetch(url);
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -180,58 +194,57 @@ async function fetchFromSource(source) {
 async function fetchLiveMatches() {
     try {
         updateStatus('fetching');
-
-        // Strategy: Race all sources, first success wins
         let result = null;
 
-        // Try primary source first (with short timeout)
-        try {
-            result = await fetchFromSource(SOURCES[0]);
-        } catch (e) {
-            if (e.message === 'RATE_LIMITED') {
-                console.warn('⚠️ OpenDota rate limited (429), backing off...');
-                consecutiveErrors++;
-                currentRefresh = Math.min(MAX_REFRESH_MS, MIN_REFRESH_MS * Math.pow(1.5, consecutiveErrors));
-                console.log(`⏱ Refresh interval increased to ${Math.round(currentRefresh / 1000)}s`);
+        // Strategy 1: Use Vercel server-side proxy (no rate limits)
+        if (PROXY_API) {
+            try {
+                const res = await fetchWithTimeout(`${PROXY_API}/live`);
+                if (res.ok) {
+                    const json = await res.json();
+                    result = { data: json.matches || json, source: json.source || 'Proxy' };
+                }
+            } catch (e) {
+                console.warn('Proxy failed, falling back to direct API:', e.message);
+            }
+        }
 
-                // Use cached data if fresh enough (< 60s)
-                if (matchCache && (Date.now() - matchCacheTime < 60000)) {
-                    liveMatches = matchCache;
-                    renderLiveMatches();
-                    updateStatus('cached');
-                    updateSourceBadge('Cached', Math.round(currentRefresh / 1000));
-                    return;
+        // Strategy 2: Direct API calls (for localhost or proxy failure)
+        if (!result) {
+            for (const source of SOURCES) {
+                try {
+                    const r = await fetchFromSource(source);
+                    result = r;
+                    break;
+                } catch (e) {
+                    if (e.message === 'RATE_LIMITED') {
+                        consecutiveErrors++;
+                        currentRefresh = Math.min(MAX_REFRESH_MS, MIN_REFRESH_MS * Math.pow(1.5, consecutiveErrors));
+                    }
+                    continue;
                 }
             }
-            // Try fallback sources
-            for (let i = 1; i < SOURCES.length; i++) {
-                try {
-                    result = await fetchFromSource(SOURCES[i]);
-                    break;
-                } catch (e2) { continue; }
-            }
         }
 
-        if (!result) {
-            // All sources failed — show cached or error
-            if (matchCache && (Date.now() - matchCacheTime < 120000)) {
-                liveMatches = matchCache;
-                renderLiveMatches();
-                updateStatus('cached');
-                updateSourceBadge('Cached', Math.round(currentRefresh / 1000));
-                return;
-            }
-            throw new Error('All sources failed');
+        // Strategy 3: Use cached data
+        if (!result && matchCache && (Date.now() - matchCacheTime < 120000)) {
+            liveMatches = matchCache;
+            renderLiveMatches();
+            updateStatus('cached');
+            updateSourceBadge('Cached', Math.round(currentRefresh / 1000));
+            return;
         }
 
-        // Success! Reset backoff
+        if (!result) throw new Error('All sources failed');
+
+        // Success
         consecutiveErrors = 0;
         currentRefresh = REFRESH_MS;
         lastFetchSource = result.source;
 
-        liveMatches = result.data
+        liveMatches = Array.isArray(result.data) ? result.data
             .filter(m => m.team_name_radiant || m.team_name_dire || m.league_id)
-            .sort((a, b) => (b.spectators || 0) - (a.spectators || 0));
+            .sort((a, b) => (b.spectators || 0) - (a.spectators || 0)) : [];
 
         // Cache successful result
         matchCache = liveMatches;
@@ -594,9 +607,11 @@ async function fetchRecentResults() {
     const grid = document.getElementById('resultsGrid');
     grid.innerHTML = '<div class="loading-state"><div class="loader"></div><p>Loading pro matches...</p></div>';
     try {
-        const res = await fetch(`${API}/proMatches?limit=20`);
+        const url = PROXY_API ? `${PROXY_API}/results` : `${API}/proMatches?limit=20`;
+        const res = await fetch(url);
         if (!res.ok) throw new Error();
-        const matches = await res.json();
+        const json = await res.json();
+        const matches = Array.isArray(json) ? json : (json.matches || []);
         grid.innerHTML = matches.map(m => {
             const dur = fmtTime(m.duration || 0);
             return `<div class="match-card" style="cursor:default">
