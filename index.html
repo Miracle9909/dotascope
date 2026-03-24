@@ -41,6 +41,27 @@
         </div>
     </header>
 
+    <!-- Mobile: Move nav from header to body as bottom tab bar -->
+    <script>
+        (function () {
+            if (window.innerWidth <= 768) {
+                var nav = document.getElementById('mainNav');
+                if (nav) document.body.appendChild(nav);
+            }
+            window.addEventListener('resize', function () {
+                var nav = document.getElementById('mainNav');
+                if (!nav) return;
+                if (window.innerWidth <= 768) {
+                    if (nav.parentElement !== document.body) document.body.appendChild(nav);
+                } else {
+                    var header = document.getElementById('header');
+                    var headerRight = header.querySelector('.header-right');
+                    if (nav.parentElement !== header) header.insertBefore(nav, headerRight);
+                }
+            });
+        })();
+    </script>
+
     <main id="app">
         <!-- LIVE VIEW -->
         <section id="liveView" class="view active">
@@ -126,7 +147,7 @@
     <footer>
         <p>DotaPlay v3.5 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> • Player data
             from <a href="https://liquipedia.net/dota2/" target="_blank">Liquipedia</a></p>
-        <p class="footer-note">Data refreshed every 15s • Multi-source with backoff • Not affiliated with Valve
+        <p class="footer-note">Data refreshed every 5s • Multi-source with backoff • Not affiliated with Valve
             Corporation</p>
     </footer>
 
