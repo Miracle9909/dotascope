@@ -27,6 +27,7 @@ let liveMatches = [];
 let playerCache = {};
 let matchCache = null;
 let matchCacheTime = 0;
+let isFetching = false;
 
 // Draft analyzer state
 const draft = { radiant: [], dire: [], activeTeam: 'radiant' };
@@ -304,6 +305,8 @@ async function fetchFromSource(source) {
 }
 
 async function fetchLiveMatches() {
+    if (isFetching) return;
+    isFetching = true;
     try {
         updateStatus('fetching');
         let result = null;
@@ -370,6 +373,8 @@ async function fetchLiveMatches() {
         updateStatus('error');
         const retryIn = Math.round(currentRefresh / 1000);
         document.getElementById('matchesGrid').innerHTML = `<div class="no-matches"><div class="no-matches-icon">📡</div><h3>Connection issue — retrying in ${retryIn}s...</h3><p style="font-size:12px;color:var(--text-muted)">API may be rate-limited. Auto-retry with backoff.</p></div>`;
+    } finally {
+        isFetching = false;
     }
 }
 
@@ -382,12 +387,20 @@ function renderLiveMatches() {
     const grid = document.getElementById('matchesGrid');
     const count = document.getElementById('matchCount');
 
+    // Remove loading spinner on first successful render
+    const spinner = grid.querySelector('.loading-state');
+    if (spinner) spinner.remove();
+
     if (liveMatches.length === 0) {
         grid.innerHTML = `<div class="no-matches"><div class="no-matches-icon">🎮</div><h3>No live pro matches right now</h3><p>Check back soon or view recent results</p></div>`;
         count.textContent = '0 Live';
         return;
     }
     count.textContent = `${liveMatches.length} Live`;
+
+    // Clear no-matches placeholder if present
+    const placeholder = grid.querySelector('.no-matches');
+    if (placeholder) placeholder.remove();
 
     // DOM Diffing: update existing cards in-place instead of destroying/rebuilding
     const existingCards = grid.querySelectorAll('.match-card[data-match-id]');
@@ -930,16 +943,18 @@ function countBits(n) { let c = 0; while (n) { c += n & 1; n >>= 1; } return c; 
 // AUTO REFRESH & UTILITIES
 // ============================================
 function startAutoRefresh() {
-    let t = currentRefresh / 1000;
+    let remaining = Math.round(currentRefresh / 1000);
     const el = document.getElementById('refreshTimer');
-    setInterval(() => {
-        t--;
-        if (el) el.textContent = `${t}s`;
-        if (t <= 0) {
-            t = Math.round(currentRefresh / 1000); // Dynamic refresh based on backoff
+    function tick() {
+        remaining--;
+        if (el) el.textContent = `${remaining}s`;
+        if (remaining <= 0) {
+            remaining = Math.round(currentRefresh / 1000);
             if (currentView === 'live') fetchLiveMatches();
         }
-    }, 1000);
+        setTimeout(tick, 1000);
+    }
+    setTimeout(tick, 1000);
 }
 
 function updateStatus(s) {
