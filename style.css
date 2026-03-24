@@ -1408,3 +1408,216 @@ a.detail-team-name:hover {
 .tmr-side {
     font-size: 11px;
 }
+
+/* ============================================ */
+/* RESPONSIVE — Mobile Bottom Tab Bar           */
+/* ============================================ */
+
+/* Tablet breakpoint */
+@media (max-width: 900px) {
+    .matches-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+
+    .detail-teams {
+        gap: 16px;
+    }
+
+    .detail-team-name {
+        font-size: 20px;
+    }
+
+    .detail-score-box {
+        font-size: 28px;
+        padding: 6px 14px;
+    }
+}
+
+/* Mobile breakpoint */
+@media (max-width: 768px) {
+    /* Header: compact, hide less important elements */
+    #header {
+        padding: 0 12px;
+        height: 52px;
+    }
+
+    .logo-icon {
+        font-size: 22px;
+    }
+
+    .logo-text {
+        font-size: 16px;
+    }
+
+    .logo-version {
+        display: none;
+    }
+
+    .header-right {
+        gap: 8px;
+    }
+
+    .connection-status span:not(.status-dot) {
+        font-size: 9px;
+    }
+
+    #sourceBadge {
+        display: none;
+    }
+
+    .refresh-indicator {
+        padding: 3px 7px;
+        font-size: 11px;
+    }
+
+    /* === BOTTOM TAB BAR === */
+    .header-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 150;
+        display: flex;
+        gap: 0;
+        background: rgba(10, 14, 23, 0.97);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border);
+        padding: 6px 8px;
+        padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+        justify-content: space-around;
+    }
+
+    .nav-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 10px 6px;
+        font-size: 11px;
+        border-radius: 10px;
+        letter-spacing: 0.3px;
+    }
+
+    .nav-btn.active {
+        box-shadow: 0 -2px 12px var(--accent-glow);
+    }
+
+    /* Add bottom padding to main content so it doesn't hide behind bottom bar */
+    #app {
+        padding-bottom: 72px;
+    }
+
+    /* Views */
+    .view {
+        padding: 12px;
+    }
+
+    .view-header h1 {
+        font-size: 18px;
+    }
+
+    /* Match cards single column */
+    .matches-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .match-card {
+        padding: 14px;
+    }
+
+    .match-team-name {
+        font-size: 13px;
+    }
+
+    .match-score {
+        font-size: 18px;
+        padding: 5px 12px;
+    }
+
+    /* Draft row hero icons smaller */
+    .draft-hero-icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    /* Draft analyzer stacked */
+    .draft-analyzer {
+        flex-direction: column;
+    }
+
+    .draft-vs {
+        flex-direction: row;
+        padding: 8px 0;
+    }
+
+    /* Modal full-screen on mobile */
+    .modal-overlay {
+        padding: 0;
+        align-items: stretch;
+    }
+
+    .modal-content {
+        border-radius: 0;
+        max-width: 100%;
+        min-height: 100vh;
+        padding: 16px;
+        padding-bottom: 80px;
+    }
+
+    .modal-close {
+        top: 8px;
+        right: 8px;
+    }
+
+    .detail-team-name {
+        font-size: 18px;
+    }
+
+    .detail-score-box {
+        font-size: 24px;
+        padding: 4px 12px;
+    }
+
+    .detail-hero-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    .detail-hero-name {
+        max-width: 38px;
+        font-size: 9px;
+    }
+
+    /* Results grid */
+    .results-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Footer */
+    footer {
+        padding-bottom: 72px;
+    }
+}
+
+/* Small phone */
+@media (max-width: 400px) {
+    .match-team-name {
+        font-size: 12px;
+        max-width: 90px;
+    }
+
+    .match-score {
+        font-size: 16px;
+        padding: 4px 10px;
+        gap: 5px;
+    }
+
+    .nav-btn {
+        font-size: 10px;
+        padding: 8px 4px;
+    }
+
+    .draft-hero-icon {
+        width: 20px;
+        height: 20px;
+    }
+}

@@ -8,13 +8,13 @@ console.log('🎮 DotaPlay v3.5 loaded | Proxy:', '/api', '| Host:', location.ho
 // Multi-source API endpoints (race for fastest)
 const SOURCES = [
     { name: 'OpenDota', live: 'https://api.opendota.com/api/live', api: 'https://api.opendota.com/api', priority: 1 },
-    { name: 'D2PT', live: 'https://api.opendota.com/api/live', api: 'https://api.opendota.com/api', priority: 2 },
+    { name: 'STRATZ', live: 'https://api.stratz.com/graphql', api: 'https://api.stratz.com/graphql', priority: 2, type: 'graphql' },
 ];
 const API = 'https://api.opendota.com/api';
 const LIQUIPEDIA = 'https://liquipedia.net/dota2/';
-const REFRESH_MS = 15000;
-const MIN_REFRESH_MS = 15000;
-const MAX_REFRESH_MS = 120000;
+const REFRESH_MS = 5000;
+const MIN_REFRESH_MS = 3000;
+const MAX_REFRESH_MS = 30000;
 
 // Auto-detect proxy: always try /api first, falls back to direct if 404
 const PROXY_API = '/api';
