@@ -40,12 +40,12 @@ function togglePin(matchId) {
     renderLiveMatches();
 }
 
-// Finished match detection
+// Finished match detection — use deactivate_time from API (reliable signal)
+// building_state bitmask offsets vary between sources and are unreliable
 function isMatchFinished(m) {
-    if (m.building_state === undefined || m.building_state === null) return false;
-    const radAncient = (m.building_state >> 9) & 0x3;  // bits 9-10: Radiant T4
-    const direAncient = (m.building_state >> 20) & 0x3; // bits 20-21: Dire T4
-    return radAncient === 0 || direAncient === 0;
+    // deactivate_time > 0 means the match server has been deactivated (game ended)
+    if (m.deactivate_time && m.deactivate_time > 0) return true;
+    return false;
 }
 
 // Bo-series grouping
