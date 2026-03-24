@@ -112,60 +112,72 @@ function renderTowerStatus(buildingState) {
     </div>`;
 }
 
-// CSS-based Minimap — shows tower positions on stylized Dota 2 map
-function renderMinimap(buildingState) {
+// Hero Minimap — positions hero portraits on stylized Dota 2 map
+function renderMinimap(buildingState, players) {
     const t = decodeTowers(buildingState);
-    // Map towers to positions: [lane][tier] = index in towers array
-    // Top lane: T1=0, T2=3, T3=6  |  Mid lane: T1=1, T2=4, T3=7  |  Bot lane: T1=2, T2=5, T3=8  |  Ancient: T4=9,10
+    const radPlayers = (players || []).filter(p => p.team === 0);
+    const direPlayers = (players || []).filter(p => p.team === 1);
+
+    // Position heroes on map by role (pos 1-5 convention in Dota 2)
+    // Pos 1 (carry) → safe lane, Pos 2 (mid), Pos 3 (offlane), Pos 4 (roam), Pos 5 (support)
+    // Radiant: safe=bot, off=top | Dire: safe=top, off=bot
+    const radPositions = [
+        { top: '75%', left: '70%' },  // pos1 carry (safe bot)
+        { top: '48%', left: '48%' },  // pos2 mid
+        { top: '25%', left: '22%' },  // pos3 offlane (top)
+        { top: '60%', left: '35%' },  // pos4 roam
+        { top: '82%', left: '55%' },  // pos5 support (safe bot)
+    ];
+    const direPositions = [
+        { top: '20%', left: '30%' },  // pos1 carry (safe top)
+        { top: '45%', left: '55%' },  // pos2 mid
+        { top: '72%', left: '78%' },  // pos3 offlane (bot)
+        { top: '35%', left: '65%' },  // pos4 roam
+        { top: '15%', left: '45%' },  // pos5 support (safe top)
+    ];
+
+    const heroIcon = (p, pos, side) => {
+        const hero = HERO_BY_ID[p.hero_id];
+        if (!hero) return '';
+        const img = getHeroImg(hero);
+        const border = side === 'r' ? '#22c55e' : '#ef4444';
+        const dead = (p.life_state === 1);
+        return `<div class="mm-hero" style="top:${pos.top};left:${pos.left}" title="${hero.l} (${p.name || 'Player'})">
+            <img src="${img}" style="border-color:${border};${dead ? 'opacity:0.3;filter:grayscale(1)' : ''}" alt="${hero.l}">
+        </div>`;
+    };
+
+    const radHeroes = radPlayers.slice(0, 5).map((p, i) => heroIcon(p, radPositions[i], 'r')).join('');
+    const direHeroes = direPlayers.slice(0, 5).map((p, i) => heroIcon(p, direPositions[i], 'd')).join('');
+
+    // Tower dots (smaller, background layer)
+    const dot = (tw, side) => {
+        const color = tw.alive ? (side === 'r' ? '#22c55e80' : '#ef444480') : '#33333360';
+        return `<div class="mm-tower-dot" style="background:${color}" title="${side === 'r' ? 'Rad' : 'Dire'} ${tw.name}"></div>`;
+    };
     const radT = t.radiant.towers;
     const direT = t.dire.towers;
-
-    const dot = (tw, side) => {
-        const color = tw.alive
-            ? (side === 'r' ? '#22c55e' : '#ef4444')
-            : '#333';
-        const glow = tw.alive ? `0 0 6px ${color}50` : 'none';
-        const size = tw.name.includes('T4') ? '10px' : '8px';
-        return `<div class="mm-dot" style="width:${size};height:${size};background:${color};box-shadow:${glow}" title="${side === 'r' ? 'Radiant' : 'Dire'} ${tw.name}"></div>`;
-    };
 
     return `
     <div class="minimap">
         <div class="mm-bg">
-            <!-- Dire base (top-right) -->
-            <div class="mm-base mm-dire-base">
-                ${dot(direT[9], 'd')}${dot(direT[10], 'd')}
-            </div>
-            <!-- Top lane -->
-            <div class="mm-lane mm-top">
-                ${dot(radT[0], 'r')}${dot(radT[3], 'r')}${dot(radT[6], 'r')}
-                <span class="mm-lane-label">TOP</span>
-                ${dot(direT[6], 'd')}${dot(direT[3], 'd')}${dot(direT[0], 'd')}
-            </div>
-            <!-- Mid lane -->
-            <div class="mm-lane mm-mid">
-                ${dot(radT[1], 'r')}${dot(radT[4], 'r')}${dot(radT[7], 'r')}
-                <span class="mm-river">🌊</span>
-                ${dot(direT[7], 'd')}${dot(direT[4], 'd')}${dot(direT[1], 'd')}
-            </div>
-            <!-- Bot lane -->
-            <div class="mm-lane mm-bot">
-                ${dot(radT[2], 'r')}${dot(radT[5], 'r')}${dot(radT[8], 'r')}
-                <span class="mm-lane-label">BOT</span>
-                ${dot(direT[8], 'd')}${dot(direT[5], 'd')}${dot(direT[2], 'd')}
-            </div>
-            <!-- Radiant base (bottom-left) -->
-            <div class="mm-base mm-rad-base">
-                ${dot(radT[9], 'r')}${dot(radT[10], 'r')}
-            </div>
-            <!-- Labels -->
-            <div class="mm-label mm-rad-label">RAD</div>
-            <div class="mm-label mm-dire-label">DIRE</div>
+            <!-- Tower overlay (subtle) -->
+            <div class="mm-tower-row mm-tower-top">${dot(radT[0], 'r')}${dot(radT[3], 'r')}${dot(direT[6], 'd')}${dot(direT[3], 'd')}${dot(direT[0], 'd')}</div>
+            <div class="mm-tower-row mm-tower-mid">${dot(radT[1], 'r')}${dot(radT[4], 'r')}${dot(direT[4], 'd')}${dot(direT[1], 'd')}</div>
+            <div class="mm-tower-row mm-tower-bot">${dot(radT[2], 'r')}${dot(radT[5], 'r')}${dot(direT[8], 'd')}${dot(direT[5], 'd')}${dot(direT[2], 'd')}</div>
+            <!-- Bases -->
+            <div class="mm-base-icon mm-rad-base-icon">☀️</div>
+            <div class="mm-base-icon mm-dire-base-icon">🌙</div>
+            <!-- River -->
+            <div class="mm-river-line"></div>
+            <!-- Hero portraits -->
+            ${radHeroes}
+            ${direHeroes}
         </div>
         <div class="mm-legend">
-            <span><span class="mm-dot-sm" style="background:#22c55e"></span> Radiant ${t.radiant.alive}/11</span>
-            <span><span class="mm-dot-sm" style="background:#ef4444"></span> Dire ${t.dire.alive}/11</span>
-            <span><span class="mm-dot-sm" style="background:#333"></span> Destroyed</span>
+            <span><span class="mm-dot-sm" style="background:#22c55e"></span> Radiant ${t.radiant.alive}/11 towers</span>
+            <span><span class="mm-dot-sm" style="background:#ef4444"></span> Dire ${t.dire.alive}/11 towers</span>
+            <span style="font-size:10px;color:var(--text-muted)">⚠️ Hero positions are lane estimates</span>
         </div>
     </div>`;
 }
@@ -414,18 +426,10 @@ function renderLiveMatches() {
     const spinner = grid.querySelector('.loading-state');
     if (spinner) spinner.remove();
 
-    // Filter out matches that have been finished for > 60s
+    // Filter: remove finished matches immediately from Live
     const now = Date.now();
     const activeMatches = liveMatches.filter(m => {
-        const matchId = String(m.match_id || m.server_steam_id || '');
-        const finished = isMatchFinished(m);
-        if (finished && !finishedMatchTimers[matchId]) {
-            finishedMatchTimers[matchId] = now;
-        }
-        if (finished && finishedMatchTimers[matchId] && (now - finishedMatchTimers[matchId] > 60000)) {
-            return false; // Hide from live after 60s
-        }
-        return true;
+        return !isMatchFinished(m);
     });
 
     if (activeMatches.length === 0) {
@@ -465,7 +469,8 @@ function renderLiveMatches() {
     const existingMap = {};
     existingCards.forEach(c => { existingMap[c.dataset.matchId] = c; });
     const newIds = new Set(activeMatches.map(m => String(m.match_id || m.server_steam_id || '')));
-    existingCards.forEach(c => { if (!newIds.has(c.dataset.matchId)) c.remove(); });
+    // Full DOM rebuild for guaranteed sort order (pinned first)
+    grid.innerHTML = '';
 
     // Track series already rendered
     const renderedSeries = new Set();
@@ -648,8 +653,8 @@ async function showMatch(idx) {
         </div>
 
         <div class="detail-section">
-            <h3>🗺️ Minimap — Tower Status</h3>
-            ${renderMinimap(m.building_state)}
+            <h3>🗺️ Hero Minimap — Live Positions</h3>
+            ${renderMinimap(m.building_state, players)}
         </div>
 
         <div class="detail-section">
