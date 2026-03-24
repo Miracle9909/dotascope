@@ -1,9 +1,9 @@
 /* ============================================ */
-/* DotaPlay v3.5 — Live Analytics & Win Predict  */
+/* DotaPlay v4.0 — Live Analytics + Pin + Series */
 /* Multi-source API + Tower + Minimap + History  */
-/* Build: 2026-03-24T17:50                       */
+/* Build: 2026-03-24T22:15                       */
 /* ============================================ */
-console.log('🎮 DotaPlay v3.5 loaded | Proxy:', '/api', '| Host:', location.hostname);
+console.log('🎮 DotaPlay v4.0 loaded | Proxy:', '/api', '| Host:', location.hostname);
 
 // Multi-source API endpoints (race for fastest)
 const SOURCES = [
@@ -29,8 +29,32 @@ let matchCache = null;
 let matchCacheTime = 0;
 let isFetching = false;
 
-// Draft analyzer state
-const draft = { radiant: [], dire: [], activeTeam: 'radiant' };
+// Pin system (LocalStorage)
+let pinnedMatchIds = new Set(JSON.parse(localStorage.getItem('dotaplay_pins') || '[]'));
+function savePins() { localStorage.setItem('dotaplay_pins', JSON.stringify([...pinnedMatchIds])); }
+function togglePin(matchId) {
+    matchId = String(matchId);
+    if (pinnedMatchIds.has(matchId)) pinnedMatchIds.delete(matchId);
+    else pinnedMatchIds.add(matchId);
+    savePins();
+    renderLiveMatches();
+}
+
+// Finished match detection
+function isMatchFinished(m) {
+    if (m.building_state === undefined || m.building_state === null) return false;
+    const radAncient = (m.building_state >> 9) & 0x3;  // bits 9-10: Radiant T4
+    const direAncient = (m.building_state >> 20) & 0x3; // bits 20-21: Dire T4
+    return radAncient === 0 || direAncient === 0;
+}
+
+// Bo-series grouping
+function getSeriesKey(m) {
+    const teams = [m.team_name_radiant || '', m.team_name_dire || ''].sort().join('|');
+    return `${m.league_id || 0}_${teams}`;
+}
+
+let finishedMatchTimers = {}; // matchId -> timestamp when detected as finished
 
 // ============================================
 // TOWER BITMASK DECODER
@@ -249,7 +273,6 @@ async function fetchPlayerRecent(accountId) {
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
-    setupDraftAnalyzer();
     fetchLiveMatches();
     startAutoRefresh();
 });
@@ -391,30 +414,63 @@ function renderLiveMatches() {
     const spinner = grid.querySelector('.loading-state');
     if (spinner) spinner.remove();
 
-    if (liveMatches.length === 0) {
+    // Filter out matches that have been finished for > 60s
+    const now = Date.now();
+    const activeMatches = liveMatches.filter(m => {
+        const matchId = String(m.match_id || m.server_steam_id || '');
+        const finished = isMatchFinished(m);
+        if (finished && !finishedMatchTimers[matchId]) {
+            finishedMatchTimers[matchId] = now;
+        }
+        if (finished && finishedMatchTimers[matchId] && (now - finishedMatchTimers[matchId] > 60000)) {
+            return false; // Hide from live after 60s
+        }
+        return true;
+    });
+
+    if (activeMatches.length === 0) {
         grid.innerHTML = `<div class="no-matches"><div class="no-matches-icon">🎮</div><h3>No live pro matches right now</h3><p>Check back soon or view recent results</p></div>`;
         count.textContent = '0 Live';
         return;
     }
-    count.textContent = `${liveMatches.length} Live`;
+
+    // Sort: pinned first, then by spectators
+    activeMatches.sort((a, b) => {
+        const aId = String(a.match_id || a.server_steam_id || '');
+        const bId = String(b.match_id || b.server_steam_id || '');
+        const aPinned = pinnedMatchIds.has(aId) ? 1 : 0;
+        const bPinned = pinnedMatchIds.has(bId) ? 1 : 0;
+        if (aPinned !== bPinned) return bPinned - aPinned;
+        return (b.spectators || 0) - (a.spectators || 0);
+    });
+
+    // Bo-series grouping
+    const seriesMap = {};
+    activeMatches.forEach(m => {
+        const key = getSeriesKey(m);
+        if (!seriesMap[key]) seriesMap[key] = [];
+        seriesMap[key].push(m);
+    });
+
+    const liveCount = activeMatches.filter(m => !isMatchFinished(m)).length;
+    const finishedCount = activeMatches.length - liveCount;
+    count.textContent = `${liveCount} Live${finishedCount ? ` · ${finishedCount} Finished` : ''}`;
 
     // Clear no-matches placeholder if present
     const placeholder = grid.querySelector('.no-matches');
     if (placeholder) placeholder.remove();
 
-    // DOM Diffing: update existing cards in-place instead of destroying/rebuilding
+    // DOM Diffing
     const existingCards = grid.querySelectorAll('.match-card[data-match-id]');
     const existingMap = {};
     existingCards.forEach(c => { existingMap[c.dataset.matchId] = c; });
+    const newIds = new Set(activeMatches.map(m => String(m.match_id || m.server_steam_id || '')));
+    existingCards.forEach(c => { if (!newIds.has(c.dataset.matchId)) c.remove(); });
 
-    const newIds = new Set(liveMatches.map(m => String(m.match_id || m.server_steam_id || '')));
+    // Track series already rendered
+    const renderedSeries = new Set();
 
-    // Remove cards no longer in live matches
-    existingCards.forEach(c => {
-        if (!newIds.has(c.dataset.matchId)) c.remove();
-    });
-
-    liveMatches.forEach((m, idx) => {
+    activeMatches.forEach((m, idx) => {
         const matchId = String(m.match_id || m.server_steam_id || idx);
         const radName = m.team_name_radiant || 'Radiant';
         const direName = m.team_name_dire || 'Dire';
@@ -425,7 +481,6 @@ function renderLiveMatches() {
         const spec = m.spectators ? `👁 ${fmtNum(m.spectators)}` : '';
         const { radPicks, direPicks } = extractDraft(m.players || []);
         const goldLead = m.radiant_lead || 0;
-        const goldPct = Math.min(95, Math.max(5, 50 + (goldLead / 500)));
         const goldColor = goldLead > 0 ? 'var(--radiant)' : goldLead < 0 ? 'var(--dire)' : 'var(--text-muted)';
         const goldIcon = goldLead > 0 ? '☀️' : goldLead < 0 ? '🌙' : '⚖️';
         const prediction = predictLive(m);
@@ -433,10 +488,30 @@ function renderLiveMatches() {
         const predWinner = prediction.radiant > prediction.dire ? radName : direName;
         const conf = Math.max(prediction.radiant, prediction.dire);
         const confLabel = conf >= 70 ? '🔥 Strong' : conf >= 60 ? '📈 Likely' : '⚖️ Close';
+        const isPinned = pinnedMatchIds.has(matchId);
+        const finished = isMatchFinished(m);
+
+        // Series info
+        const seriesKey = getSeriesKey(m);
+        const seriesMatches = seriesMap[seriesKey] || [m];
+        const isSeriesMatch = seriesMatches.length > 1;
+        let seriesHeader = '';
+        if (isSeriesMatch && !renderedSeries.has(seriesKey)) {
+            renderedSeries.add(seriesKey);
+            const boType = seriesMatches.length >= 3 ? 'Bo5' : seriesMatches.length >= 2 ? 'Bo3' : 'Bo1';
+            seriesHeader = `<div class="series-header">🏆 ${boType} — ${esc(radName)} vs ${esc(direName)} · Game ${seriesMatches.indexOf(m) + 1}</div>`;
+        } else if (isSeriesMatch) {
+            seriesHeader = `<div class="series-header" style="font-size:11px">Game ${seriesMatches.indexOf(m) + 1} of series</div>`;
+        }
+
+        // Status badge
+        const statusBadge = finished
+            ? `<div class="finished-badge">✅ FINISHED</div>`
+            : `<div class="live-badge"><span class="pulse-sm"></span> LIVE ${spec}</div>`;
 
         const existingCard = existingMap[matchId];
         if (existingCard) {
-            // In-place update — only change dynamic values
+            // In-place update
             const scoreEl = existingCard.querySelector('.score-radiant');
             if (scoreEl) scoreEl.textContent = radScore;
             const scoreDire = existingCard.querySelector('.score-dire');
@@ -456,17 +531,30 @@ function renderLiveMatches() {
             if (predD) predD.textContent = `${prediction.dire}%`;
             const confEl = existingCard.querySelector('.card-conf');
             if (confEl) confEl.textContent = `${confLabel} — ${esc(predWinner)}`;
-            // Update onclick index
-            existingCard.onclick = () => showMatch(idx);
+            // Update pin state
+            existingCard.classList.toggle('pinned', isPinned);
+            const pinBtn = existingCard.querySelector('.pin-btn');
+            if (pinBtn) pinBtn.textContent = isPinned ? '📌' : '📍';
+            // Update finished state
+            const badgeEl = existingCard.querySelector('.live-badge, .finished-badge');
+            if (badgeEl && finished) {
+                badgeEl.className = 'finished-badge';
+                badgeEl.innerHTML = '✅ FINISHED';
+            }
+            existingCard.onclick = () => showMatch(activeMatches.indexOf(m));
             return;
         }
 
-        // New card — create fresh
+        // New card
         const cardHtml = `
-        <div class="match-card" data-match-id="${matchId}" onclick="showMatch(${idx})">
+        <div class="match-card ${isPinned ? 'pinned' : ''} ${finished ? 'finished' : ''}" data-match-id="${matchId}">
+            ${seriesHeader}
             <div class="match-league">
                 <span>${esc(league)}</span>
-                <div class="live-badge"><span class="pulse-sm"></span> LIVE ${spec}</div>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <button class="pin-btn" onclick="event.stopPropagation();togglePin('${matchId}')" title="${isPinned ? 'Unpin' : 'Pin to top'}">${isPinned ? '📌' : '📍'}</button>
+                    ${statusBadge}
+                </div>
             </div>
             <div class="match-timer">⏱ ${duration}</div>
             <div class="match-teams">
@@ -495,6 +583,7 @@ function renderLiveMatches() {
         temp.innerHTML = cardHtml.trim();
         const newCard = temp.firstChild;
         newCard.style.animation = 'fadeIn 0.3s ease';
+        newCard.onclick = () => showMatch(activeMatches.indexOf(m));
         grid.appendChild(newCard);
     });
 }
@@ -811,92 +900,7 @@ async function fetchRecentResults() {
 // ============================================
 // DRAFT ANALYZER
 // ============================================
-function setupDraftAnalyzer() {
-    renderDraftSlots(); renderHeroGrid();
-    document.getElementById('resetDraft').addEventListener('click', resetDraft);
-    document.getElementById('heroSearch').addEventListener('input', filterHeroes);
-    document.querySelectorAll('#heroFilters .filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('#heroFilters .filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active'); filterHeroes();
-        });
-    });
-}
-
-function renderDraftSlots() {
-    ['radiant', 'dire'].forEach(team => {
-        const el = document.getElementById(`${team}Slots`);
-        el.innerHTML = '';
-        for (let i = 0; i < 5; i++) {
-            const hero = draft[team][i];
-            const slot = document.createElement('div');
-            slot.className = `draft-slot ${team}-slot ${hero ? 'filled' : ''}`;
-            slot.onclick = () => { if (!hero) draft.activeTeam = team; };
-            if (hero) {
-                slot.innerHTML = `<img src="${getHeroImg(hero)}" alt="${hero.l}" title="${hero.l}">
-                    <button class="remove-hero" onclick="event.stopPropagation();removeHero('${team}',${i})">✕</button>`;
-            } else slot.textContent = '+';
-            el.appendChild(slot);
-        }
-    });
-}
-
-function renderHeroGrid() {
-    const grid = document.getElementById('heroGrid');
-    const search = (document.getElementById('heroSearch')?.value || '').toLowerCase();
-    const attr = document.querySelector('#heroFilters .filter-btn.active')?.dataset.attr || 'all';
-    const picked = new Set([...draft.radiant.map(h => h.id), ...draft.dire.map(h => h.id)]);
-    const filtered = HEROES.filter(h => {
-        if (search && !h.l.toLowerCase().includes(search) && !h.n.includes(search)) return false;
-        if (attr !== 'all' && h.a !== attr) return false;
-        return true;
-    });
-    grid.innerHTML = filtered.map(h => {
-        const wrColor = h.w >= 52 ? 'var(--radiant)' : h.w <= 48 ? 'var(--dire)' : 'var(--text-secondary)';
-        return `<button class="hero-pick-btn ${picked.has(h.id) ? 'picked' : ''}" onclick="pickHero(${h.id})" title="${h.l} (${h.w}% WR)">
-            <img src="${getHeroImg(h)}" alt="${h.l}" loading="lazy">
-            <span class="hero-wr" style="color:${wrColor}">${h.w}%</span>
-        </button>`;
-    }).join('');
-}
-
-function pickHero(heroId) {
-    const hero = HERO_BY_ID[heroId];
-    if (!hero) return;
-    let team = draft.activeTeam;
-    if (draft[team].length >= 5) { team = team === 'radiant' ? 'dire' : 'radiant'; draft.activeTeam = team; }
-    if (draft[team].length >= 5) return;
-    draft[team].push(hero);
-    if (draft[team].length >= 5) draft.activeTeam = team === 'radiant' ? 'dire' : 'radiant';
-    updateDraftUI();
-}
-
-function removeHero(team, i) { draft[team].splice(i, 1); updateDraftUI(); }
-function resetDraft() { draft.radiant = []; draft.dire = []; draft.activeTeam = 'radiant'; updateDraftUI(); }
-function updateDraftUI() { renderDraftSlots(); renderHeroGrid(); updateWinPred(); }
-function filterHeroes() { renderHeroGrid(); }
-
-function updateWinPred() {
-    const pred = calcDraftWR(draft.radiant, draft.dire);
-    document.getElementById('radiantWinPct').textContent = `${pred.radiant}%`;
-    document.getElementById('direWinPct').textContent = `${pred.dire}%`;
-    document.getElementById('radiantWinBar').style.width = `${pred.radiant}%`;
-    document.getElementById('direWinBar').style.width = `${pred.dire}%`;
-}
-
-function calcDraftWR(rad, dire) {
-    if (!rad.length && !dire.length) return { radiant: 50, dire: 50 };
-    const rAvg = rad.length ? rad.reduce((s, h) => s + h.w, 0) / rad.length : 50;
-    const dAvg = dire.length ? dire.reduce((s, h) => s + h.w, 0) / dire.length : 50;
-    let rPct = Math.round(rAvg / (rAvg + dAvg) * 100);
-    if (rad.length === 5 && dire.length < 5) rPct = Math.min(rPct + 2, 85);
-    if (dire.length === 5 && rad.length < 5) rPct = Math.max(rPct - 2, 15);
-    const rAttrs = new Set(rad.map(h => h.a));
-    const dAttrs = new Set(dire.map(h => h.a));
-    if (rAttrs.size >= 3) rPct = Math.min(rPct + 1, 80);
-    if (dAttrs.size >= 3) rPct = Math.max(rPct - 1, 20);
-    return { radiant: rPct, dire: 100 - rPct };
-}
+// Draft analyzer removed — win prediction integrated into live match cards via predictLive()
 
 // ============================================
 // WIN PREDICTION ENGINE (ENHANCED)

@@ -1410,6 +1410,81 @@ a.detail-team-name:hover {
 }
 
 /* ============================================ */
+/* PIN / FINISHED / SERIES                      */
+/* ============================================ */
+
+.pin-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 4px;
+    line-height: 1;
+    filter: grayscale(0.5);
+    transition: filter 0.2s, transform 0.2s;
+}
+
+.pin-btn:hover {
+    filter: grayscale(0);
+    transform: scale(1.2);
+}
+
+.match-card.pinned {
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow), var(--shadow);
+    position: relative;
+}
+
+.match-card.pinned::before {
+    content: '📌 Pinned';
+    position: absolute;
+    top: -10px;
+    left: 12px;
+    background: var(--accent);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.finished-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--radiant);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+}
+
+.match-card.finished {
+    opacity: 0.75;
+    border-left: 3px solid var(--radiant);
+}
+
+.match-card.finished:hover {
+    opacity: 1;
+}
+
+.series-header {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(168, 85, 247, 0.1));
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    text-align: center;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+/* ============================================ */
 /* RESPONSIVE — Mobile Bottom Tab Bar           */
 /* ============================================ */
 
@@ -1557,15 +1632,6 @@ a.detail-team-name:hover {
         height: 24px;
     }
 
-    /* Draft analyzer stacked */
-    .draft-analyzer {
-        flex-direction: column;
-    }
-
-    .draft-vs {
-        flex-direction: row;
-        padding: 8px 0;
-    }
 
     /* Modal full-screen on mobile */
     .modal-overlay {

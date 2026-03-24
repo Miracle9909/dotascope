@@ -23,12 +23,11 @@
                 <span class="logo-icon">⚔️</span>
                 <span class="logo-text">DOTA<span class="accent">PLAY</span></span>
             </div>
-            <span class="logo-version">v3.5</span>
+            <span class="logo-version">v4.0</span>
         </div>
         <nav class="header-nav" id="mainNav">
             <button class="nav-btn active" data-view="live" id="navLive"><span class="pulse-dot"></span> LIVE</button>
             <button class="nav-btn" data-view="results" id="navResults">RESULTS</button>
-            <button class="nav-btn" data-view="draft" id="navDraft">DRAFT ANALYZER</button>
         </nav>
         <div class="header-right">
             <div class="refresh-indicator" id="refreshIndicator">
@@ -113,52 +112,11 @@
             </div>
         </section>
 
-        <!-- DRAFT ANALYZER VIEW -->
-        <section id="draftView" class="view">
-            <div class="view-header">
-                <h1>🧠 Draft Analyzer</h1>
-                <p class="view-subtitle">Pick heroes to predict win probability</p>
-            </div>
-            <div class="draft-analyzer">
-                <div class="draft-team radiant-team">
-                    <h2 class="team-label radiant">☀️ RADIANT</h2>
-                    <div class="draft-slots" id="radiantSlots"></div>
-                    <div class="win-bar">
-                        <div class="win-fill radiant-fill" id="radiantWinBar"></div>
-                    </div>
-                    <div class="win-pct" id="radiantWinPct">50%</div>
-                </div>
-                <div class="draft-vs">
-                    <span class="vs-text">VS</span>
-                    <button class="reset-draft-btn" id="resetDraft">⟳ Reset</button>
-                </div>
-                <div class="draft-team dire-team">
-                    <h2 class="team-label dire">🌙 DIRE</h2>
-                    <div class="draft-slots" id="direSlots"></div>
-                    <div class="win-bar">
-                        <div class="win-fill dire-fill" id="direWinBar"></div>
-                    </div>
-                    <div class="win-pct" id="direWinPct">50%</div>
-                </div>
-            </div>
-            <div class="hero-picker">
-                <div class="picker-header">
-                    <input type="text" class="hero-search" id="heroSearch" placeholder="🔍 Search heroes...">
-                    <div class="hero-filters" id="heroFilters">
-                        <button class="filter-btn active" data-attr="all">All</button>
-                        <button class="filter-btn" data-attr="str">💪 STR</button>
-                        <button class="filter-btn" data-attr="agi">🏹 AGI</button>
-                        <button class="filter-btn" data-attr="int">🧠 INT</button>
-                        <button class="filter-btn" data-attr="uni">✨ UNI</button>
-                    </div>
-                </div>
-                <div class="hero-grid" id="heroGrid"></div>
-            </div>
-        </section>
     </main>
 
     <footer>
-        <p>DotaPlay v3.5 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> • Player data
+        <p>DotaPlay v4.0 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> + <a
+                href="https://stratz.com" target="_blank">STRATZ</a> • Player data
             from <a href="https://liquipedia.net/dota2/" target="_blank">Liquipedia</a></p>
         <p class="footer-note">Data refreshed every 5s • Multi-source with backoff • Not affiliated with Valve
             Corporation</p>
