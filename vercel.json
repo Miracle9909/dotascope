@@ -2,20 +2,21 @@
     "buildCommand": "",
     "outputDirectory": ".",
     "framework": null,
+    "functions": {
+        "api/*.js": {
+            "runtime": "@vercel/node@3"
+        }
+    },
     "rewrites": [
         {
-            "source": "/(.*)",
-            "destination": "/index.html"
+            "source": "/api/(.*)",
+            "destination": "/api/$1"
         }
     ],
     "headers": [
         {
             "source": "/(.*)",
             "headers": [
-                {
-                    "key": "Cache-Control",
-                    "value": "public, max-age=3600"
-                },
                 {
                     "key": "X-Content-Type-Options",
                     "value": "nosniff"
@@ -27,7 +28,7 @@
             "headers": [
                 {
                     "key": "Cache-Control",
-                    "value": "public, max-age=86400"
+                    "value": "public, max-age=60, s-maxage=60"
                 }
             ]
         },
@@ -36,7 +37,16 @@
             "headers": [
                 {
                     "key": "Cache-Control",
-                    "value": "public, max-age=86400"
+                    "value": "public, max-age=3600"
+                }
+            ]
+        },
+        {
+            "source": "/(.+\\.html)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=60"
                 }
             ]
         }
