@@ -1,9 +1,9 @@
 /* ============================================ */
-/* DotaPlay v3.0 — Live Analytics & Win Predict  */
-/* Multi-source API + Tower + Player stats       */
-/* Build: 2026-03-24T16:30                       */
+/* DotaPlay v3.5 — Live Analytics & Win Predict  */
+/* Multi-source API + Tower + Minimap + History  */
+/* Build: 2026-03-24T17:50                       */
 /* ============================================ */
-console.log('🎮 DotaPlay v3.0 loaded | Proxy:', '/api', '| Host:', location.hostname);
+console.log('🎮 DotaPlay v3.5 loaded | Proxy:', '/api', '| Host:', location.hostname);
 
 // Multi-source API endpoints (race for fastest)
 const SOURCES = [
@@ -85,6 +85,117 @@ function renderTowerStatus(buildingState) {
             <div class="tower-icons">${renderSide(t.dire, 'var(--dire)')}</div>
         </div>
     </div>`;
+}
+
+// CSS-based Minimap — shows tower positions on stylized Dota 2 map
+function renderMinimap(buildingState) {
+    const t = decodeTowers(buildingState);
+    // Map towers to positions: [lane][tier] = index in towers array
+    // Top lane: T1=0, T2=3, T3=6  |  Mid lane: T1=1, T2=4, T3=7  |  Bot lane: T1=2, T2=5, T3=8  |  Ancient: T4=9,10
+    const radT = t.radiant.towers;
+    const direT = t.dire.towers;
+
+    const dot = (tw, side) => {
+        const color = tw.alive
+            ? (side === 'r' ? '#22c55e' : '#ef4444')
+            : '#333';
+        const glow = tw.alive ? `0 0 6px ${color}50` : 'none';
+        const size = tw.name.includes('T4') ? '10px' : '8px';
+        return `<div class="mm-dot" style="width:${size};height:${size};background:${color};box-shadow:${glow}" title="${side === 'r' ? 'Radiant' : 'Dire'} ${tw.name}"></div>`;
+    };
+
+    return `
+    <div class="minimap">
+        <div class="mm-bg">
+            <!-- Dire base (top-right) -->
+            <div class="mm-base mm-dire-base">
+                ${dot(direT[9], 'd')}${dot(direT[10], 'd')}
+            </div>
+            <!-- Top lane -->
+            <div class="mm-lane mm-top">
+                ${dot(radT[0], 'r')}${dot(radT[3], 'r')}${dot(radT[6], 'r')}
+                <span class="mm-lane-label">TOP</span>
+                ${dot(direT[6], 'd')}${dot(direT[3], 'd')}${dot(direT[0], 'd')}
+            </div>
+            <!-- Mid lane -->
+            <div class="mm-lane mm-mid">
+                ${dot(radT[1], 'r')}${dot(radT[4], 'r')}${dot(radT[7], 'r')}
+                <span class="mm-river">🌊</span>
+                ${dot(direT[7], 'd')}${dot(direT[4], 'd')}${dot(direT[1], 'd')}
+            </div>
+            <!-- Bot lane -->
+            <div class="mm-lane mm-bot">
+                ${dot(radT[2], 'r')}${dot(radT[5], 'r')}${dot(radT[8], 'r')}
+                <span class="mm-lane-label">BOT</span>
+                ${dot(direT[8], 'd')}${dot(direT[5], 'd')}${dot(direT[2], 'd')}
+            </div>
+            <!-- Radiant base (bottom-left) -->
+            <div class="mm-base mm-rad-base">
+                ${dot(radT[9], 'r')}${dot(radT[10], 'r')}
+            </div>
+            <!-- Labels -->
+            <div class="mm-label mm-rad-label">RAD</div>
+            <div class="mm-label mm-dire-label">DIRE</div>
+        </div>
+        <div class="mm-legend">
+            <span><span class="mm-dot-sm" style="background:#22c55e"></span> Radiant ${t.radiant.alive}/11</span>
+            <span><span class="mm-dot-sm" style="background:#ef4444"></span> Dire ${t.dire.alive}/11</span>
+            <span><span class="mm-dot-sm" style="background:#333"></span> Destroyed</span>
+        </div>
+    </div>`;
+}
+
+// Styled gold advantage bar
+function renderGoldBar(goldLead, radName, direName) {
+    const abs = Math.abs(goldLead);
+    const pct = Math.min(95, Math.max(5, 50 + (goldLead / 500)));
+    const leadTeam = goldLead >= 0 ? radName : direName;
+    const leadColor = goldLead > 0 ? 'var(--radiant)' : goldLead < 0 ? 'var(--dire)' : 'var(--text-muted)';
+    const icon = goldLead > 0 ? '☀️' : goldLead < 0 ? '🌙' : '⚖️';
+    return `
+    <div class="gold-bar-container">
+        <div class="gold-bar-header">
+            <span style="color:var(--radiant);font-size:12px;font-weight:600">${esc(radName)}</span>
+            <span style="color:${leadColor};font-weight:800;font-size:14px">${icon} ${goldLead > 0 ? '+' : ''}${fmtGold(goldLead)} gold</span>
+            <span style="color:var(--dire);font-size:12px;font-weight:600">${esc(direName)}</span>
+        </div>
+        <div class="gold-bar">
+            <div class="gold-fill-rad" style="width:${pct}%"></div>
+        </div>
+    </div>`;
+}
+
+// Team match history fetch
+async function fetchTeamHistory(teamId) {
+    if (!teamId) return [];
+    try {
+        const url = PROXY_API ? `${PROXY_API}/team?id=${teamId}` : `${API}/teams/${teamId}/matches?limit=10`;
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return Array.isArray(json) ? json : (json.matches || []);
+    } catch { return []; }
+}
+
+function renderTeamHistory(matches, teamName, teamId) {
+    if (!matches.length) return '<div style="color:var(--text-muted);font-size:12px;padding:8px">No recent matches found</div>';
+    return matches.slice(0, 10).map(m => {
+        const isRad = m.radiant;
+        const won = isRad ? m.radiant_win : !m.radiant_win;
+        const opponent = isRad ? (m.opposing_team_name || 'Unknown') : (m.opposing_team_name || 'Unknown');
+        const dur = fmtTime(m.duration || 0);
+        return `<div class="team-match-row">
+            <span class="tmr-result ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'}</span>
+            <span class="tmr-vs">vs ${esc(opponent)}</span>
+            <span class="tmr-dur">${dur}</span>
+            <span class="tmr-side">${isRad ? '☀️' : '🌙'}</span>
+        </div>`;
+    }).join('');
+}
+
+function updateSourceBadge(src, interval) {
+    const el = document.getElementById('sourceBadge');
+    if (el) el.innerHTML = `<span style="font-size:10px;color:var(--accent)">⚡${src} · ${interval}s</span>`;
 }
 
 // ============================================
@@ -278,7 +389,20 @@ function renderLiveMatches() {
     }
     count.textContent = `${liveMatches.length} Live`;
 
-    grid.innerHTML = liveMatches.map((m, idx) => {
+    // DOM Diffing: update existing cards in-place instead of destroying/rebuilding
+    const existingCards = grid.querySelectorAll('.match-card[data-match-id]');
+    const existingMap = {};
+    existingCards.forEach(c => { existingMap[c.dataset.matchId] = c; });
+
+    const newIds = new Set(liveMatches.map(m => String(m.match_id || m.server_steam_id || '')));
+
+    // Remove cards no longer in live matches
+    existingCards.forEach(c => {
+        if (!newIds.has(c.dataset.matchId)) c.remove();
+    });
+
+    liveMatches.forEach((m, idx) => {
+        const matchId = String(m.match_id || m.server_steam_id || idx);
         const radName = m.team_name_radiant || 'Radiant';
         const direName = m.team_name_dire || 'Dire';
         const radScore = m.radiant_score || 0;
@@ -288,17 +412,45 @@ function renderLiveMatches() {
         const spec = m.spectators ? `👁 ${fmtNum(m.spectators)}` : '';
         const { radPicks, direPicks } = extractDraft(m.players || []);
         const goldLead = m.radiant_lead || 0;
+        const goldPct = Math.min(95, Math.max(5, 50 + (goldLead / 500)));
         const goldColor = goldLead > 0 ? 'var(--radiant)' : goldLead < 0 ? 'var(--dire)' : 'var(--text-muted)';
         const goldIcon = goldLead > 0 ? '☀️' : goldLead < 0 ? '🌙' : '⚖️';
         const prediction = predictLive(m);
         const towers = decodeTowers(m.building_state);
-        const towerDiff = towers.dire.destroyed - towers.radiant.destroyed;
         const predWinner = prediction.radiant > prediction.dire ? radName : direName;
         const conf = Math.max(prediction.radiant, prediction.dire);
         const confLabel = conf >= 70 ? '🔥 Strong' : conf >= 60 ? '📈 Likely' : '⚖️ Close';
 
-        return `
-        <div class="match-card" onclick="showMatch(${idx})">
+        const existingCard = existingMap[matchId];
+        if (existingCard) {
+            // In-place update — only change dynamic values
+            const scoreEl = existingCard.querySelector('.score-radiant');
+            if (scoreEl) scoreEl.textContent = radScore;
+            const scoreDire = existingCard.querySelector('.score-dire');
+            if (scoreDire) scoreDire.textContent = direScore;
+            const timerEl = existingCard.querySelector('.match-timer');
+            if (timerEl) timerEl.textContent = `⏱ ${duration}`;
+            const goldEl = existingCard.querySelector('.card-gold-text');
+            if (goldEl) goldEl.innerHTML = `${goldIcon} ${goldLead > 0 ? '+' : ''}${fmtGold(goldLead)}`;
+            goldEl && (goldEl.style.color = goldColor);
+            const towerEl = existingCard.querySelector('.card-tower-text');
+            if (towerEl) towerEl.textContent = `⛫ ${towers.radiant.alive} vs ${towers.dire.alive}`;
+            const predFill = existingCard.querySelector('.prediction-fill');
+            if (predFill) predFill.style.width = `${prediction.radiant}%`;
+            const predR = existingCard.querySelector('.prediction-label.r');
+            if (predR) predR.textContent = `${prediction.radiant}%`;
+            const predD = existingCard.querySelector('.prediction-label.d');
+            if (predD) predD.textContent = `${prediction.dire}%`;
+            const confEl = existingCard.querySelector('.card-conf');
+            if (confEl) confEl.textContent = `${confLabel} — ${esc(predWinner)}`;
+            // Update onclick index
+            existingCard.onclick = () => showMatch(idx);
+            return;
+        }
+
+        // New card — create fresh
+        const cardHtml = `
+        <div class="match-card" data-match-id="${matchId}" onclick="showMatch(${idx})">
             <div class="match-league">
                 <span>${esc(league)}</span>
                 <div class="live-badge"><span class="pulse-sm"></span> LIVE ${spec}</div>
@@ -313,9 +465,9 @@ function renderLiveMatches() {
                 </div>
                 <div class="match-team"><div class="match-team-name" style="color:var(--dire)">${esc(direName)}</div></div>
             </div>
-            <div style="text-align:center;margin:4px 0;font-size:12px">
-                <span style="color:${goldColor};font-weight:700">💰 ${goldIcon} ${goldLead > 0 ? '+' : ''}${fmtGold(goldLead)}</span>
-                <span style="margin-left:12px;color:var(--text-muted)">🏛 ${towers.radiant.alive} vs ${towers.dire.alive}</span>
+            <div class="card-stats-row">
+                <span class="card-gold-text" style="color:${goldColor}">💰 ${goldIcon} ${goldLead > 0 ? '+' : ''}${fmtGold(goldLead)}</span>
+                <span class="card-tower-text">⛫ ${towers.radiant.alive} vs ${towers.dire.alive}</span>
             </div>
             ${renderDraftRow(radPicks, direPicks)}
             <div class="match-prediction">
@@ -323,9 +475,15 @@ function renderLiveMatches() {
                 <div class="prediction-bar"><div class="prediction-fill" style="width:${prediction.radiant}%"></div></div>
                 <span class="prediction-label d">${prediction.dire}%</span>
             </div>
-            <div style="text-align:center;margin-top:4px;font-size:11px;color:var(--text-muted)">${confLabel} — ${esc(predWinner)}</div>
+            <div class="card-conf">${confLabel} — ${esc(predWinner)}</div>
         </div>`;
-    }).join('');
+
+        const temp = document.createElement('div');
+        temp.innerHTML = cardHtml.trim();
+        const newCard = temp.firstChild;
+        newCard.style.animation = 'fadeIn 0.3s ease';
+        grid.appendChild(newCard);
+    });
 }
 
 // ============================================
@@ -384,17 +542,12 @@ async function showMatch(idx) {
 
         <div class="detail-section">
             <h3>💰 Gold Advantage</h3>
-            <div style="text-align:center;padding:12px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
-                <div style="font-size:13px;color:var(--text-muted)">${goldLead >= 0 ? '☀️' : '🌙'} ${esc(goldTeam)} leads</div>
-                <div style="font-family:var(--font-display);font-size:32px;font-weight:900;color:${goldColor}">
-                    ${goldLead > 0 ? '+' : ''}${fmtGold(goldLead)}
-                </div>
-            </div>
+            ${renderGoldBar(goldLead, radName, direName)}
         </div>
 
         <div class="detail-section">
-            <h3>🏛 Tower Status</h3>
-            ${renderTowerStatus(m.building_state)}
+            <h3>🗺️ Minimap — Tower Status</h3>
+            ${renderMinimap(m.building_state)}
         </div>
 
         <div class="detail-section">
@@ -415,12 +568,22 @@ async function showMatch(idx) {
             <h3>📈 Stats</h3>
             <div class="detail-stats">
                 <div class="stat-card"><div class="stat-label">💰 Gold Lead</div><div class="stat-value" style="color:${goldColor}">${goldLead > 0 ? '+' : ''}${fmtGold(goldLead)}</div></div>
-                <div class="stat-card"><div class="stat-label">🏛 Towers (R/D)</div><div class="stat-value">${decodeTowers(m.building_state).radiant.alive} / ${decodeTowers(m.building_state).dire.alive}</div></div>
+                <div class="stat-card"><div class="stat-label">⛫ Towers (R/D)</div><div class="stat-value">${decodeTowers(m.building_state).radiant.alive} / ${decodeTowers(m.building_state).dire.alive}</div></div>
                 <div class="stat-card"><div class="stat-label">⚔️ Total Kills</div><div class="stat-value">${radScore + direScore}</div></div>
                 <div class="stat-card"><div class="stat-label">🎯 Kill Diff</div><div class="stat-value" style="color:${radScore >= direScore ? 'var(--radiant)' : 'var(--dire)'}">${radScore >= direScore ? '+' : ''}${radScore - direScore}</div></div>
                 <div class="stat-card"><div class="stat-label">👁 Spectators</div><div class="stat-value" style="color:var(--cyan)">${fmtNum(m.spectators || 0)}</div></div>
                 <div class="stat-card"><div class="stat-label">🏆 MMR</div><div class="stat-value" style="color:var(--purple)">${m.average_mmr || 'N/A'}</div></div>
             </div>
+        </div>
+
+        <div class="detail-section">
+            <h3>📋 Team Match History</h3>
+            <div class="team-history-tabs">
+                <button class="th-tab active" onclick="loadTeamHistory(${m.team_id_radiant || 0},'radHistoryGrid','${esc(radName)}',this)" style="color:var(--radiant)">☀️ ${esc(radName)}</button>
+                <button class="th-tab" onclick="loadTeamHistory(${m.team_id_dire || 0},'direHistoryGrid','${esc(direName)}',this)" style="color:var(--dire)">🌙 ${esc(direName)}</button>
+            </div>
+            <div id="radHistoryGrid" class="team-history-content"><div style="color:var(--text-muted);font-size:12px;padding:12px">Click a team tab to load history</div></div>
+            <div id="direHistoryGrid" class="team-history-content" style="display:none"></div>
         </div>
     `;
     modal.classList.add('active');
@@ -800,3 +963,19 @@ window.showPlayer = showPlayer;
 window.pickHero = pickHero;
 window.removeHero = removeHero;
 window.closeModal = closeModal;
+
+// Team history loader (called from match detail modal)
+async function loadTeamHistory(teamId, gridId, teamName, btn) {
+    if (!teamId) return;
+    // Toggle tab active state
+    document.querySelectorAll('.th-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    // Show/hide grids
+    document.querySelectorAll('.team-history-content').forEach(g => g.style.display = 'none');
+    const grid = document.getElementById(gridId);
+    grid.style.display = 'block';
+    grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px">Loading...</div>';
+    const matches = await fetchTeamHistory(teamId);
+    grid.innerHTML = renderTeamHistory(matches, teamName, teamId);
+}
+window.loadTeamHistory = loadTeamHistory;
