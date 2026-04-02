@@ -4,30 +4,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>DotaPlay — Live Dota 2 Analytics & Win Prediction</title>
+    <title>EsportsPlay — Live Dota 2 & LoL Analytics</title>
     <meta name="description"
-        content="Real-time Dota 2 match tracking with AI-powered win prediction based on draft, player hero pool, net worth, and tower status.">
+        content="Real-time Dota 2 & League of Legends match tracking with live stats, win prediction, and player analytics.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=35">
+    <link rel="stylesheet" href="style.css?v=50">
     <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
 </head>
 
 <body>
     <header id="header">
         <div class="header-left">
             <div class="logo">
-                <span class="logo-icon">⚔️</span>
-                <span class="logo-text">DOTA<span class="accent">PLAY</span></span>
+                <span class="logo-icon">🎮</span>
+                <span class="logo-text">ESPORTS<span class="accent">PLAY</span></span>
             </div>
-            <span class="logo-version">v4.0</span>
+            <span class="logo-version">v5.0</span>
         </div>
         <nav class="header-nav" id="mainNav">
-            <button class="nav-btn active" data-view="live" id="navLive"><span class="pulse-dot"></span> LIVE</button>
-            <button class="nav-btn" data-view="results" id="navResults">RESULTS</button>
+            <div class="game-switcher">
+                <button class="game-tab active" data-game="dota" onclick="switchGame('dota')">⚔️ DOTA 2</button>
+                <button class="game-tab" data-game="lol" onclick="switchGame('lol')">🎮 LOL</button>
+            </div>
+            <div class="view-switcher">
+                <button class="nav-btn active" data-view="live" id="navLive"><span class="pulse-dot"></span>
+                    LIVE</button>
+                <button class="nav-btn" data-view="results" id="navResults">RESULTS</button>
+            </div>
         </nav>
         <div class="header-right">
             <div class="refresh-indicator" id="refreshIndicator">
@@ -40,56 +47,37 @@
         </div>
     </header>
 
-    <!-- Mobile: Move nav from header to body as bottom tab bar -->
-    <script>
-        (function () {
-            function setupMobileNav() {
-                var nav = document.getElementById('mainNav');
-                if (!nav) return;
-                if (window.innerWidth <= 768) {
-                    // Move to body
-                    if (nav.parentElement !== document.body) document.body.appendChild(nav);
-                    // Apply inline styles (highest CSS priority)
-                    nav.style.cssText = 'position:fixed;bottom:0;left:0;right:0;top:auto;z-index:9999;display:flex;flex-direction:row;background:rgba(10,14,23,0.98);border-top:1px solid rgba(59,130,246,0.15);padding:8px 12px;justify-content:space-around;align-items:center;box-shadow:0 -4px 20px rgba(0,0,0,0.5);height:auto;max-height:60px;width:100%;box-sizing:border-box;gap:4px;';
-                    // Style buttons
-                    var btns = nav.querySelectorAll('.nav-btn');
-                    btns.forEach(function (btn) {
-                        btn.style.cssText += 'flex:1 0 auto;padding:10px 6px;font-size:11px;white-space:nowrap;max-height:40px;';
-                    });
-                } else {
-                    // Restore to header
-                    var header = document.getElementById('header');
-                    var headerRight = header ? header.querySelector('.header-right') : null;
-                    if (header && nav.parentElement !== header) {
-                        header.insertBefore(nav, headerRight);
-                    }
-                    // Clear inline styles
-                    nav.style.cssText = '';
-                    var btns = nav.querySelectorAll('.nav-btn');
-                    btns.forEach(function (btn) { btn.style.cssText = ''; });
-                }
-            }
-            setupMobileNav();
-            window.addEventListener('resize', setupMobileNav);
-        })();
-    </script>
-
     <main id="app">
-        <!-- LIVE VIEW -->
+        <!-- DOTA LIVE VIEW -->
         <section id="liveView" class="view active">
-            <div class="view-header">
-                <h1>🔴 Live Matches</h1>
-                <div class="match-count" id="matchCount">Loading...</div>
+            <div id="dotaLiveView">
+                <div class="view-header">
+                    <h1>⚔️ Dota 2 — Live Matches</h1>
+                    <div class="match-count" id="matchCount">Loading...</div>
+                </div>
+                <div class="matches-grid" id="matchesGrid">
+                    <div class="loading-state">
+                        <div class="loader"></div>
+                        <p>Connecting to Dota 2 servers...</p>
+                    </div>
+                </div>
             </div>
-            <div class="matches-grid" id="matchesGrid">
-                <div class="loading-state">
-                    <div class="loader"></div>
-                    <p>Connecting to Dota 2 servers...</p>
+
+            <div id="lolLiveView" style="display:none">
+                <div class="view-header">
+                    <h1>🎮 League of Legends — Live Matches</h1>
+                    <div class="match-count lol-count" id="lolMatchCount">Loading...</div>
+                </div>
+                <div class="matches-grid" id="lolMatchesGrid">
+                    <div class="loading-state">
+                        <div class="loader"></div>
+                        <p>Connecting to LoL Esports...</p>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- MATCH DETAIL MODAL -->
+        <!-- DOTA MATCH DETAIL MODAL -->
         <div class="modal-overlay" id="matchModal">
             <div class="modal-content" id="matchDetail"></div>
         </div>
@@ -97,6 +85,11 @@
         <!-- PLAYER DETAIL MODAL -->
         <div class="modal-overlay" id="playerModal">
             <div class="modal-content modal-sm" id="playerDetail"></div>
+        </div>
+
+        <!-- LOL MATCH DETAIL MODAL -->
+        <div class="modal-overlay" id="lolMatchModal">
+            <div class="modal-content" id="lolMatchDetail"></div>
         </div>
 
         <!-- RESULTS VIEW -->
@@ -111,19 +104,18 @@
                 </div>
             </div>
         </section>
-
     </main>
 
     <footer>
-        <p>DotaPlay v4.0 — Powered by <a href="https://www.opendota.com/" target="_blank">OpenDota</a> + <a
-                href="https://stratz.com" target="_blank">STRATZ</a> • Player data
-            from <a href="https://liquipedia.net/dota2/" target="_blank">Liquipedia</a></p>
-        <p class="footer-note">Data refreshed every 5s • Multi-source with backoff • Not affiliated with Valve
-            Corporation</p>
+        <p>EsportsPlay v5.0 — Dota 2: <a href="https://www.opendota.com/" target="_blank">OpenDota</a> + <a
+                href="https://stratz.com" target="_blank">STRATZ</a> • LoL: <a href="https://lolesports.com"
+                target="_blank">Lolesports</a> • Player data
+            from <a href="https://liquipedia.net/" target="_blank">Liquipedia</a></p>
+        <p class="footer-note">Auto-refresh • Multi-source with backoff • Not affiliated with Valve or Riot</p>
     </footer>
 
-    <script src="heroes.js?v=35"></script>
-    <script src="app.js?v=35"></script>
+    <script src="heroes.js?v=50"></script>
+    <script src="app.js?v=50"></script>
 </body>
 
 </html>

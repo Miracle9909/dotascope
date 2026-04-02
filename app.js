@@ -1,9 +1,9 @@
 /* ============================================ */
-/* DotaPlay v4.0 — Live Analytics + Pin + Series */
-/* Multi-source API + Tower + Minimap + History  */
-/* Build: 2026-03-24T22:15                       */
+/* EsportsPlay v5.0 — Dota 2 + LoL Live        */
+/* Multi-source API + Enhanced Stats + Mobile   */
+/* Build: 2026-04-02T14:00                       */
 /* ============================================ */
-console.log('🎮 DotaPlay v4.0 loaded | Proxy:', '/api', '| Host:', location.hostname);
+console.log('🎮 EsportsPlay v5.0 loaded | Proxy:', '/api', '| Host:', location.hostname);
 
 // Multi-source API endpoints (race for fastest)
 const SOURCES = [
@@ -23,10 +23,15 @@ let currentRefresh = REFRESH_MS;
 let consecutiveErrors = 0;
 let lastFetchSource = '';
 let currentView = 'live';
+let currentGame = 'dota'; // 'dota' or 'lol'
 let liveMatches = [];
 let playerCache = {};
 let matchCache = null;
 let matchCacheTime = 0;
+let lolMatches = [];
+let lolCache = null;
+let lolCacheTime = 0;
+const LOL_DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/14.24.1/img';
 let isFetching = false;
 
 // Pin system (LocalStorage)
@@ -285,6 +290,7 @@ async function fetchPlayerRecent(accountId) {
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
+    setupGameSwitcher();
     fetchLiveMatches();
     startAutoRefresh();
 });
@@ -302,6 +308,31 @@ function setupNavigation() {
     document.getElementById('playerModal').addEventListener('click', e => {
         if (e.target === e.currentTarget) closeModal('playerModal');
     });
+    const lolModal = document.getElementById('lolMatchModal');
+    if (lolModal) lolModal.addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeModal('lolMatchModal');
+    });
+}
+
+function setupGameSwitcher() {
+    // Mobile bottom nav game tabs
+    document.querySelectorAll('.game-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchGame(tab.dataset.game));
+    });
+}
+
+function switchGame(game) {
+    currentGame = game;
+    document.querySelectorAll('.game-tab').forEach(t => t.classList.remove('active'));
+    const activeTab = document.querySelector(`[data-game="${game}"]`);
+    if (activeTab) activeTab.classList.add('active');
+
+    const dotaView = document.getElementById('dotaLiveView');
+    const lolView = document.getElementById('lolLiveView');
+    if (dotaView) dotaView.style.display = game === 'dota' ? 'block' : 'none';
+    if (lolView) lolView.style.display = game === 'lol' ? 'block' : 'none';
+
+    if (game === 'lol' && lolMatches.length === 0) fetchLoLLive();
 }
 
 function switchView(view) {
@@ -845,30 +876,49 @@ function renderDetailHeroes(players, side) {
 function renderPlayerTable(radPlayers, direPlayers) {
     const row = (p, side) => {
         const hero = HERO_BY_ID[p.hero_id];
-        const hImg = hero ? `<img src="${getHeroImg(hero)}" style="width:22px;height:22px;border-radius:3px;vertical-align:middle" loading="lazy">` : '';
+        const hImg = hero ? `<img src="${getHeroImg(hero)}" class="pt-hero-img" title="${hero.l}" loading="lazy">` : '';
         const name = p.name || p.personaname || 'Player';
         const sideColor = side === 'radiant' ? 'var(--radiant)' : 'var(--dire)';
         const clickable = p.account_id ? `onclick="showPlayer(${p.account_id})" style="cursor:pointer"` : '';
-        return `<tr data-player-id="${p.account_id || ''}" ${clickable} title="Click for player profile">
-            <td style="padding:6px 8px;white-space:nowrap">${hImg} <span style="color:${sideColor};font-weight:600">${esc(name)}</span></td>
-            <td class="player-hero-wr" style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-muted)">Loading...</td>
-            <td style="padding:6px 8px;text-align:center">
-                ${p.account_id ? `<a href="${LIQUIPEDIA}${encodeURIComponent(name.replace(/ /g, '_'))}" target="_blank" style="color:var(--accent);font-size:11px">Liqui ↗</a>` : '-'}
+        const k = p.kills || 0, d = p.deaths || 0, a = p.assists || 0;
+        const cs = p.last_hits || 0;
+        const dn = p.denies || 0;
+        const nw = p.net_worth || p.gold || 0;
+        const gpm = p.gold_per_min || 0;
+        const kdaRatio = d === 0 ? (k + a) : ((k + a) / d).toFixed(1);
+        const kdaColor = kdaRatio >= 4 ? 'var(--radiant)' : kdaRatio >= 2 ? 'var(--gold)' : kdaRatio < 1 ? 'var(--dire)' : 'var(--text-primary)';
+        return `<tr data-player-id="${p.account_id || ''}" ${clickable} class="pt-row" title="Click for player profile">
+            <td class="pt-cell pt-hero-cell">
+                ${hImg}
+                <span style="color:${sideColor};font-weight:600" class="pt-name">${esc(name)}</span>
             </td>
+            <td class="pt-cell pt-kda" style="color:${kdaColor}">
+                <span class="pt-kda-nums">${k}<span class="pt-slash">/</span>${d}<span class="pt-slash">/</span>${a}</span>
+            </td>
+            <td class="pt-cell pt-cs">${cs}<span class="pt-denies">/${dn}</span></td>
+            <td class="pt-cell pt-gold">${fmtNum(nw)}</td>
+            <td class="pt-cell pt-gpm">${gpm || '-'}</td>
+            <td class="player-hero-wr pt-cell pt-wr">...</td>
         </tr>`;
     };
-    return `<table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead><tr style="color:var(--text-muted);font-size:11px;text-transform:uppercase">
-            <th style="padding:6px 8px;text-align:left">Player / Hero</th>
-            <th style="padding:6px 8px">Hero WR (Player)</th>
-            <th style="padding:6px 8px">Liquipedia</th>
+    return `<div class="pt-wrapper">
+    <table class="player-table">
+        <thead><tr class="pt-header">
+            <th class="pt-th">Player</th>
+            <th class="pt-th">KDA</th>
+            <th class="pt-th">CS</th>
+            <th class="pt-th">NW</th>
+            <th class="pt-th">GPM</th>
+            <th class="pt-th">Hero WR</th>
         </tr></thead>
         <tbody>
+            <tr class="pt-team-divider"><td colspan="6"><span style="color:var(--radiant)">☀️ RADIANT</span></td></tr>
             ${radPlayers.map(p => row(p, 'radiant')).join('')}
-            <tr><td colspan="3" style="padding:4px;background:var(--border)"></td></tr>
+            <tr class="pt-team-divider"><td colspan="6"><span style="color:var(--dire)">🌙 DIRE</span></td></tr>
             ${direPlayers.map(p => row(p, 'dire')).join('')}
         </tbody>
-    </table>`;
+    </table>
+    </div>`;
 }
 
 // ============================================
@@ -959,7 +1009,10 @@ function startAutoRefresh() {
         if (el) el.textContent = `${remaining}s`;
         if (remaining <= 0) {
             remaining = Math.round(currentRefresh / 1000);
-            if (currentView === 'live') fetchLiveMatches();
+            if (currentView === 'live') {
+                if (currentGame === 'dota') fetchLiveMatches();
+                else if (currentGame === 'lol') fetchLoLLive();
+            }
         }
         setTimeout(tick, 1000);
     }
@@ -987,14 +1040,13 @@ window.showPlayer = showPlayer;
 window.pickHero = pickHero;
 window.removeHero = removeHero;
 window.closeModal = closeModal;
+window.switchGame = switchGame;
 
 // Team history loader (called from match detail modal)
 async function loadTeamHistory(teamId, gridId, teamName, btn) {
     if (!teamId) return;
-    // Toggle tab active state
     document.querySelectorAll('.th-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    // Show/hide grids
     document.querySelectorAll('.team-history-content').forEach(g => g.style.display = 'none');
     const grid = document.getElementById(gridId);
     grid.style.display = 'block';
@@ -1003,3 +1055,293 @@ async function loadTeamHistory(teamId, gridId, teamName, btn) {
     grid.innerHTML = renderTeamHistory(matches, teamName, teamId);
 }
 window.loadTeamHistory = loadTeamHistory;
+
+// ============================================
+// LOL LIVE MODULE
+// ============================================
+function getChampImg(champId) {
+    if (!champId) return '';
+    return `${LOL_DDRAGON}/champion/${champId}.png`;
+}
+
+async function fetchLoLLive() {
+    const grid = document.getElementById('lolMatchesGrid');
+    const count = document.getElementById('lolMatchCount');
+    if (!grid) return;
+
+    try {
+        const res = await fetch(`${PROXY_API}/lol-live`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        lolMatches = data.matches || [];
+        lolCache = lolMatches;
+        lolCacheTime = Date.now();
+        renderLoLMatches();
+        updateSourceBadge(data.source || 'Lolesports', '8');
+    } catch (err) {
+        console.error('LoL fetch error:', err);
+        if (lolCache && (Date.now() - lolCacheTime < 120000)) {
+            lolMatches = lolCache;
+            renderLoLMatches();
+            return;
+        }
+        grid.innerHTML = `<div class="no-matches"><div class="no-matches-icon">🎮</div><h3>No LoL data available</h3><p style="color:var(--text-muted);font-size:13px">${err.message}<br>LoL matches are available during LCK, LPL, LEC, LCS broadcast hours</p></div>`;
+        if (count) count.textContent = '0 Live';
+    }
+}
+
+function renderLoLMatches() {
+    const grid = document.getElementById('lolMatchesGrid');
+    const count = document.getElementById('lolMatchCount');
+    if (!grid) return;
+
+    // Remove loading spinner
+    const spinner = grid.querySelector('.loading-state');
+    if (spinner) spinner.remove();
+
+    if (lolMatches.length === 0) {
+        grid.innerHTML = `<div class="no-matches"><div class="no-matches-icon">🎮</div><h3>No live LoL pro matches</h3><p>Pro matches run during LCK/LPL/LEC/LCS hours</p></div>`;
+        if (count) count.textContent = '0 Live';
+        return;
+    }
+
+    if (count) count.textContent = `${lolMatches.length} Live`;
+
+    grid.innerHTML = lolMatches.map((m, idx) => {
+        const match = m.match;
+        const league = m.league?.name || 'Pro Match';
+        const leagueImg = m.league?.image || '';
+        const team1 = match.teams?.[0] || {};
+        const team2 = match.teams?.[1] || {};
+        const strategy = match.strategy || {};
+        const gameNum = m.current_game?.number || '?';
+        const live = m.live;
+
+        const blueKills = live?.blue?.totalKills || 0;
+        const redKills = live?.red?.totalKills || 0;
+        const blueGold = live?.blue?.totalGold || 0;
+        const redGold = live?.red?.totalGold || 0;
+        const blueTowers = live?.blue?.towers || 0;
+        const redTowers = live?.red?.towers || 0;
+        const goldDiff = live?.goldDiff || 0;
+        const goldColor = goldDiff > 0 ? 'var(--lol-blue)' : goldDiff < 0 ? 'var(--lol-red)' : 'var(--text-muted)';
+        const goldIcon = goldDiff > 0 ? '🔵' : goldDiff < 0 ? '🔴' : '⚖️';
+
+        // Dragon icons
+        const dragonIcons = (dragons) => (dragons || []).map(d => {
+            const icons = { infernal: '🔥', mountain: '⛰️', ocean: '🌊', cloud: '☁️', hextech: '⚡', chemtech: '☣️', elder: '👑' };
+            return icons[d] || '🐲';
+        }).join('');
+
+        // Champion picks row
+        const bluePicks = (live?.blue?.players || []).map(p =>
+            p.champion ? `<div class="draft-hero-icon"><img src="${getChampImg(p.champion)}" alt="${p.champion}" loading="lazy"></div>` : ''
+        ).join('');
+        const redPicks = (live?.red?.players || []).map(p =>
+            p.champion ? `<div class="draft-hero-icon"><img src="${getChampImg(p.champion)}" alt="${p.champion}" loading="lazy"></div>` : ''
+        ).join('');
+
+        return `<div class="match-card lol-card" onclick="showLoLMatch(${idx})">
+            <div class="match-league">
+                <span>${leagueImg ? `<img src="${leagueImg}" class="league-icon">` : '🎮'} ${esc(league)}</span>
+                <div class="live-badge lol-live-badge"><span class="pulse-sm"></span> LIVE · G${gameNum}</div>
+            </div>
+            <div class="lol-series-info">${strategy.type === 'bestOf' ? `Bo${strategy.count}` : ''} · ${team1.wins || 0} - ${team2.wins || 0}</div>
+            <div class="match-teams">
+                <div class="match-team">
+                    ${team1.image ? `<img src="${team1.image}" class="lol-team-logo" alt="${esc(team1.name)}">` : ''}
+                    <div class="match-team-name" style="color:var(--lol-blue)">${esc(team1.name || team1.code || 'Blue')}</div>
+                </div>
+                <div class="match-score lol-score">
+                    <span style="color:var(--lol-blue)">${blueKills}</span>
+                    <span class="score-separator">—</span>
+                    <span style="color:var(--lol-red)">${redKills}</span>
+                </div>
+                <div class="match-team">
+                    ${team2.image ? `<img src="${team2.image}" class="lol-team-logo" alt="${esc(team2.name)}">` : ''}
+                    <div class="match-team-name" style="color:var(--lol-red)">${esc(team2.name || team2.code || 'Red')}</div>
+                </div>
+            </div>
+            ${live ? `
+            <div class="card-stats-row">
+                <span class="card-gold-text" style="color:${goldColor}">💰 ${goldIcon} ${goldDiff > 0 ? '+' : ''}${fmtGold(goldDiff)}</span>
+                <span class="card-tower-text">🏰 ${blueTowers} vs ${redTowers}</span>
+            </div>
+            <div class="lol-objectives">
+                <span class="lol-obj-side" style="color:var(--lol-blue)">${dragonIcons(live.blue.dragons)} ${live.blue.barons ? `👑${live.blue.barons}` : ''}</span>
+                <span style="color:var(--text-muted);font-size:10px">objectives</span>
+                <span class="lol-obj-side" style="color:var(--lol-red)">${dragonIcons(live.red.dragons)} ${live.red.barons ? `👑${live.red.barons}` : ''}</span>
+            </div>
+            ${bluePicks || redPicks ? `<div class="match-draft"><div class="draft-side">${bluePicks}</div><span class="draft-vs-label">VS</span><div class="draft-side">${redPicks}</div></div>` : ''}
+            ` : '<div class="card-stats-row"><span style="color:var(--text-muted);font-size:12px">⏳ Waiting for live data...</span></div>'}
+        </div>`;
+    }).join('');
+}
+
+// ============================================
+// LOL MATCH DETAIL MODAL
+// ============================================
+function showLoLMatch(idx) {
+    const m = lolMatches[idx];
+    if (!m) return;
+    const modal = document.getElementById('lolMatchModal');
+    const detail = document.getElementById('lolMatchDetail');
+    if (!modal || !detail) return;
+
+    const match = m.match;
+    const league = m.league?.name || 'Pro Match';
+    const team1 = match.teams?.[0] || {};
+    const team2 = match.teams?.[1] || {};
+    const strategy = match.strategy || {};
+    const gameNum = m.current_game?.number || '?';
+    const live = m.live;
+
+    if (!live) {
+        detail.innerHTML = `<button class="modal-close" onclick="closeModal('lolMatchModal')">✕</button>
+            <div class="no-matches"><div class="no-matches-icon">⏳</div><h3>Waiting for live data...</h3></div>`;
+        modal.classList.add('active');
+        return;
+    }
+
+    const goldDiff = live.goldDiff || 0;
+    const goldColor = goldDiff > 0 ? 'var(--lol-blue)' : goldDiff < 0 ? 'var(--lol-red)' : 'var(--text-muted)';
+    const goldLeadTeam = goldDiff >= 0 ? (team1.name || 'Blue') : (team2.name || 'Red');
+
+    // Dragon icons
+    const dragonIcon = (d) => {
+        const icons = { infernal: '🔥', mountain: '⛰️', ocean: '🌊', cloud: '☁️', hextech: '⚡', chemtech: '☣️', elder: '👑' };
+        return icons[d] || '🐲';
+    };
+
+    // Game tabs
+    const gameTabs = (match.games || []).map(g => {
+        const isActive = g.id === m.current_game?.id;
+        const stateLabel = g.state === 'completed' ? '✅' : g.state === 'inProgress' ? '🔴 LIVE' : '—';
+        return `<button class="lol-game-tab ${isActive ? 'active' : ''}">${stateLabel} Game ${g.number}</button>`;
+    }).join('');
+
+    // Player table
+    const playerRow = (p, side) => {
+        const champImg = p.champion ? `<img src="${getChampImg(p.champion)}" class="pt-hero-img" title="${p.champion}">` : '';
+        const sideColor = side === 'blue' ? 'var(--lol-blue)' : 'var(--lol-red)';
+        const k = p.kills, d = p.deaths, a = p.assists;
+        const kdaRatio = d === 0 ? (k + a) : ((k + a) / d).toFixed(1);
+        const kdaColor = kdaRatio >= 4 ? 'var(--radiant)' : kdaRatio >= 2 ? 'var(--gold)' : kdaRatio < 1 ? 'var(--dire)' : 'var(--text-primary)';
+        const hpPct = p.maxHealth > 0 ? Math.round(p.currentHealth / p.maxHealth * 100) : 100;
+        const hpColor = hpPct > 60 ? 'var(--radiant)' : hpPct > 30 ? 'var(--gold)' : 'var(--dire)';
+        const role = p.role ? p.role.toUpperCase() : '';
+        return `<tr class="pt-row">
+            <td class="pt-cell pt-hero-cell">
+                ${champImg}
+                <div class="pt-player-info">
+                    <span style="color:${sideColor};font-weight:600" class="pt-name">${esc(p.summonerName || 'Player')}</span>
+                    <span class="pt-role">${role}</span>
+                </div>
+            </td>
+            <td class="pt-cell">
+                <div class="lol-hp-bar"><div class="lol-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+            </td>
+            <td class="pt-cell pt-kda" style="color:${kdaColor}"><span class="pt-kda-nums">${k}<span class="pt-slash">/</span>${d}<span class="pt-slash">/</span>${a}</span></td>
+            <td class="pt-cell pt-cs">${p.creepScore}</td>
+            <td class="pt-cell pt-gold">${fmtNum(p.totalGold)}</td>
+            <td class="pt-cell pt-level">Lv${p.level}</td>
+        </tr>`;
+    };
+
+    // Gold bar (same concept as Dota)
+    const goldPct = Math.min(95, Math.max(5, 50 + (goldDiff / 500)));
+
+    detail.innerHTML = `
+        <button class="modal-close" onclick="closeModal('lolMatchModal')">✕</button>
+        <div class="detail-header">
+            <div class="detail-league">${esc(league)}</div>
+            <div class="lol-series-info">${strategy.type === 'bestOf' ? `Best of ${strategy.count}` : ''} · Score: ${team1.wins || 0} - ${team2.wins || 0}</div>
+            <div class="detail-teams">
+                <div class="detail-team-block">
+                    ${team1.image ? `<img src="${team1.image}" class="lol-detail-logo">` : ''}
+                    <span class="detail-team-name" style="color:var(--lol-blue)">${esc(team1.name || 'Blue')}</span>
+                </div>
+                <div class="detail-score-box lol-score-box">
+                    <span style="color:var(--lol-blue)">${live.blue.totalKills}</span>
+                    <span style="color:var(--text-muted)"> — </span>
+                    <span style="color:var(--lol-red)">${live.red.totalKills}</span>
+                </div>
+                <div class="detail-team-block">
+                    ${team2.image ? `<img src="${team2.image}" class="lol-detail-logo">` : ''}
+                    <span class="detail-team-name" style="color:var(--lol-red)">${esc(team2.name || 'Red')}</span>
+                </div>
+            </div>
+            <div class="lol-game-tabs-row">${gameTabs}</div>
+        </div>
+
+        <div class="detail-section">
+            <h3>💰 Gold Advantage</h3>
+            <div class="gold-bar-container">
+                <div class="gold-bar-header">
+                    <span style="color:var(--lol-blue);font-size:12px;font-weight:600">${esc(team1.name || 'Blue')}</span>
+                    <span style="color:${goldColor};font-weight:800;font-size:14px">${goldIcon()} ${goldDiff > 0 ? '+' : ''}${fmtGold(goldDiff)} gold</span>
+                    <span style="color:var(--lol-red);font-size:12px;font-weight:600">${esc(team2.name || 'Red')}</span>
+                </div>
+                <div class="gold-bar lol-gold-bar">
+                    <div class="gold-fill-blue" style="width:${goldPct}%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h3>🏰 Structures & Objectives</h3>
+            <div class="detail-stats">
+                <div class="stat-card"><div class="stat-label">🏰 Towers</div><div class="stat-value"><span style="color:var(--lol-blue)">${live.blue.towers}</span> - <span style="color:var(--lol-red)">${live.red.towers}</span></div></div>
+                <div class="stat-card"><div class="stat-label">🏚️ Inhibitors</div><div class="stat-value"><span style="color:var(--lol-blue)">${live.blue.inhibitors}</span> - <span style="color:var(--lol-red)">${live.red.inhibitors}</span></div></div>
+                <div class="stat-card"><div class="stat-label">🐲 Dragons</div><div class="stat-value"><span style="color:var(--lol-blue)">${(live.blue.dragons || []).map(d => dragonIcon(d)).join('') || '0'}</span> — <span style="color:var(--lol-red)">${(live.red.dragons || []).map(d => dragonIcon(d)).join('') || '0'}</span></div></div>
+                <div class="stat-card"><div class="stat-label">👑 Barons</div><div class="stat-value"><span style="color:var(--lol-blue)">${live.blue.barons}</span> - <span style="color:var(--lol-red)">${live.red.barons}</span></div></div>
+                <div class="stat-card"><div class="stat-label">💰 Total Gold</div><div class="stat-value" style="font-size:14px"><span style="color:var(--lol-blue)">${fmtNum(live.blue.totalGold)}</span> — <span style="color:var(--lol-red)">${fmtNum(live.red.totalGold)}</span></div></div>
+                <div class="stat-card"><div class="stat-label">⚔️ Total Kills</div><div class="stat-value">${live.blue.totalKills + live.red.totalKills}</div></div>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h3>🔵 ${esc(team1.name || 'Blue Team')} — Players</h3>
+            <div class="pt-wrapper">
+            <table class="player-table">
+                <thead><tr class="pt-header">
+                    <th class="pt-th">Champion</th>
+                    <th class="pt-th">HP</th>
+                    <th class="pt-th">KDA</th>
+                    <th class="pt-th">CS</th>
+                    <th class="pt-th">Gold</th>
+                    <th class="pt-th">Lv</th>
+                </tr></thead>
+                <tbody>${(live.blue.players || []).map(p => playerRow(p, 'blue')).join('')}</tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h3>🔴 ${esc(team2.name || 'Red Team')} — Players</h3>
+            <div class="pt-wrapper">
+            <table class="player-table">
+                <thead><tr class="pt-header">
+                    <th class="pt-th">Champion</th>
+                    <th class="pt-th">HP</th>
+                    <th class="pt-th">KDA</th>
+                    <th class="pt-th">CS</th>
+                    <th class="pt-th">Gold</th>
+                    <th class="pt-th">Lv</th>
+                </tr></thead>
+                <tbody>${(live.red.players || []).map(p => playerRow(p, 'red')).join('')}</tbody>
+            </table>
+            </div>
+        </div>
+
+        ${m.patch ? `<div style="text-align:center;padding:8px;font-size:11px;color:var(--text-muted)">Patch ${m.patch}</div>` : ''}
+    `;
+
+    // Fix goldIcon call inside template
+    function goldIcon() {
+        return goldDiff > 0 ? '🔵' : goldDiff < 0 ? '🔴' : '⚖️';
+    }
+
+    modal.classList.add('active');
+}
+window.showLoLMatch = showLoLMatch;

@@ -26,6 +26,11 @@
     --gold-bg: rgba(234, 179, 8, 0.1);
     --purple: #a855f7;
     --cyan: #06b6d4;
+    /* LoL Colors */
+    --lol-blue: #0099ff;
+    --lol-blue-bg: rgba(0, 153, 255, 0.1);
+    --lol-red: #ff3333;
+    --lol-red-bg: rgba(255, 51, 51, 0.1);
     --font-main: 'Inter', -apple-system, sans-serif;
     --font-display: 'Orbitron', monospace;
     --radius: 12px;
@@ -1826,5 +1831,449 @@ a.detail-team-name:hover {
     .draft-hero-icon {
         width: 20px;
         height: 20px;
+    }
+}
+
+/* ============================================ */
+/* GAME SWITCHER                                */
+/* ============================================ */
+.game-switcher {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 2px;
+    margin-right: 8px;
+}
+
+.game-tab {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-main);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+}
+
+.game-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-card);
+}
+
+.game-tab.active {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.view-switcher {
+    display: flex;
+    gap: 4px;
+}
+
+/* ============================================ */
+/* ENHANCED PLAYER TABLE                        */
+/* ============================================ */
+.pt-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.player-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 420px;
+}
+
+.pt-header {
+    background: var(--bg-secondary);
+}
+
+.pt-th {
+    padding: 8px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    text-align: center;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+}
+
+.pt-th:first-child {
+    text-align: left;
+}
+
+.pt-row {
+    transition: background 0.15s;
+}
+
+.pt-row:hover {
+    background: var(--bg-card-hover);
+}
+
+.pt-cell {
+    padding: 6px 10px;
+    text-align: center;
+    font-size: 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid rgba(42, 53, 80, 0.4);
+}
+
+.pt-hero-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+}
+
+.pt-hero-img {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.pt-name {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+.pt-kda {
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.pt-kda-nums {
+    letter-spacing: 0.5px;
+}
+
+.pt-slash {
+    color: var(--text-muted);
+    font-weight: 400;
+    margin: 0 1px;
+}
+
+.pt-cs {
+    color: var(--text-secondary);
+}
+
+.pt-denies {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.pt-gold {
+    color: var(--gold);
+    font-weight: 600;
+}
+
+.pt-gpm {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.pt-wr {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.pt-level {
+    color: var(--cyan);
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.pt-team-divider {
+    background: var(--bg-secondary);
+}
+
+.pt-team-divider td {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pt-player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.pt-role {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================ */
+/* LOL HEALTH BAR                               */
+/* ============================================ */
+.lol-hp-bar {
+    width: 50px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.lol-hp-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background 0.3s;
+}
+
+/* ============================================ */
+/* LOL MATCH CARD                               */
+/* ============================================ */
+.lol-card::before {
+    background: linear-gradient(90deg, var(--lol-blue), var(--accent), var(--lol-red)) !important;
+}
+
+.lol-live-badge {
+    background: var(--lol-red-bg) !important;
+    color: var(--lol-red) !important;
+}
+
+.lol-live-badge .pulse-sm {
+    background: var(--lol-red) !important;
+}
+
+.lol-series-info {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.lol-team-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: contain;
+    margin-bottom: 4px;
+}
+
+.lol-detail-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: contain;
+    margin-bottom: 4px;
+}
+
+.lol-count {
+    background: var(--lol-blue-bg) !important;
+    color: var(--lol-blue) !important;
+}
+
+.league-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+/* LoL Objectives */
+.lol-objectives {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    border-top: 1px solid rgba(42, 53, 80, 0.4);
+    margin-top: 6px;
+}
+
+.lol-obj-side {
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+/* LoL Game Tabs */
+.lol-game-tabs-row {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.lol-game-tab {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-family: var(--font-main);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: default;
+    transition: all 0.2s;
+}
+
+.lol-game-tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* LoL Gold Bar */
+.lol-gold-bar {
+    background: var(--lol-red) !important;
+}
+
+.gold-fill-blue {
+    height: 100%;
+    background: linear-gradient(90deg, var(--lol-blue), #33bbff);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+/* LoL Score Box */
+.lol-score-box {
+    border: 1px solid var(--border) !important;
+}
+
+.detail-team-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ============================================ */
+/* MOBILE RESPONSIVE — ENHANCED                 */
+/* ============================================ */
+@media (max-width: 768px) {
+
+    /* Game switcher in header */
+    .game-switcher {
+        margin-right: 4px;
+    }
+
+    .game-tab {
+        font-size: 10px;
+        padding: 5px 8px;
+    }
+
+    /* Player table mobile */
+    .player-table {
+        font-size: 11px;
+        min-width: 360px;
+    }
+
+    .pt-cell {
+        padding: 5px 6px;
+        font-size: 11px;
+    }
+
+    .pt-hero-img {
+        width: 22px;
+        height: 22px;
+    }
+
+    .pt-name {
+        max-width: 70px;
+        font-size: 11px;
+    }
+
+    .pt-kda {
+        font-size: 11px;
+    }
+
+    .pt-th {
+        padding: 6px;
+        font-size: 9px;
+    }
+
+    /* LoL elements mobile */
+    .lol-team-logo {
+        width: 24px;
+        height: 24px;
+    }
+
+    .lol-detail-logo {
+        width: 36px;
+        height: 36px;
+    }
+
+    .lol-game-tabs-row {
+        flex-wrap: wrap;
+    }
+
+    .lol-game-tab {
+        padding: 4px 10px;
+        font-size: 10px;
+    }
+
+    .lol-hp-bar {
+        width: 36px;
+        height: 5px;
+    }
+
+    /* Header game/view tabs */
+    .header-nav {
+        flex-direction: column;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .view-switcher {
+        gap: 2px;
+    }
+}
+
+@media (max-width: 480px) {
+    .game-tab {
+        font-size: 9px;
+        padding: 4px 6px;
+    }
+
+    .pt-name {
+        max-width: 55px;
+        font-size: 10px;
+    }
+
+    .pt-cell {
+        padding: 4px 4px;
+    }
+
+    .pt-hero-img {
+        width: 20px;
+        height: 20px;
+    }
+
+    .pt-denies {
+        display: none;
+    }
+
+    .pt-gpm {
+        display: none;
+    }
+
+    /* Hide GPM column on very small screens */
+    .pt-th:nth-child(5),
+    .pt-cell.pt-gpm {
+        display: none;
     }
 }
